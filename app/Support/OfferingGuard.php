@@ -27,6 +27,13 @@ class OfferingGuard
         WaterBowlSession::class,
     ];
 
+    /** @var list<class-string<Model>> */
+    private const PERMANENT_CAPABLE_MODELS = [
+        ButterLamp::class,
+        FlowerOffering::class,
+        MusicOffering::class,
+    ];
+
     public static function expiresAt(): Carbon
     {
         return now()->addHours(self::DURATION_HOURS);
@@ -40,7 +47,14 @@ class OfferingGuard
     public static function applyActiveScope(Builder $query, string $modelClass): Builder
     {
         if (in_array($modelClass, self::EXPIRING_MODELS, true)) {
-            $query->where('expires_at', '>', now());
+            if (in_array($modelClass, self::PERMANENT_CAPABLE_MODELS, true)) {
+                $query->where(function (Builder $active) {
+                    $active->where('is_permanent', true)
+                        ->orWhere('expires_at', '>', now());
+                });
+            } else {
+                $query->where('expires_at', '>', now());
+            }
         }
 
         return $query;
@@ -112,9 +126,7 @@ class OfferingGuard
         string $shrine = 'avalokiteshvara',
     ): void {
         $count = self::applyActiveScope(
-            $modelClass::query()
-                ->where('shrine', $shrine)
-                ->where('visitor_token', $visitorToken),
+            self::visitorOfferingQuery($modelClass, $visitorToken, $shrine),
             $modelClass,
         )->count();
 
@@ -135,9 +147,7 @@ class OfferingGuard
 
         foreach ($models as $key => $modelClass) {
             $used = self::applyActiveScope(
-                $modelClass::query()
-                    ->where('shrine', $shrine)
-                    ->where('visitor_token', $visitorToken),
+                self::visitorOfferingQuery($modelClass, $visitorToken, $shrine),
                 $modelClass,
             )->count();
 
@@ -149,5 +159,25 @@ class OfferingGuard
         }
 
         return $limits;
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @return Builder<Model>
+     */
+    private static function visitorOfferingQuery(
+        string $modelClass,
+        string $visitorToken,
+        string $shrine,
+    ): Builder {
+        $query = $modelClass::query()
+            ->where('shrine', $shrine)
+            ->where('visitor_token', $visitorToken);
+
+        if (in_array($modelClass, self::PERMANENT_CAPABLE_MODELS, true)) {
+            $query->where('is_permanent', false);
+        }
+
+        return $query;
     }
 }

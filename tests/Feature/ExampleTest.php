@@ -49,6 +49,8 @@ class ExampleTest extends TestCase
         $response->assertSee('Mantra Repetitions');
         $response->assertSee('Live practitioners');
         $response->assertSee('Offer music');
+        $response->assertSee('Visit the Amitāyus shrine', false);
+        $response->assertSee('Visit the Amitābha shrine', false);
     }
 
     public function test_a_butter_lamp_can_be_offered(): void
@@ -59,8 +61,8 @@ class ExampleTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('lamp.name', 'Tenzin');
-        $response->assertJsonPath('dedication_names.0', 'Tenzin');
-        $response->assertJsonPath('offering_names.0', 'Tenzin');
+        $response->assertJsonFragment(['name' => 'All Beings']);
+        $response->assertJsonFragment(['name' => 'Tenzin']);
     }
 
     public function test_mantra_repetitions_are_pooled(): void
@@ -117,7 +119,8 @@ class ExampleTest extends TestCase
         $response->assertJsonPath('offering.track.youtube_id', 'QZ94XtY_fJM');
         $response->assertJsonPath('offering.track.title', 'Snow Lion by Tenzin Chogyal');
         $response->assertJsonPath('offering.track.youtube_start_seconds', 814);
-        $response->assertJsonPath('shrine_state.music.active.0.name', 'Mila');
+        $response->assertJsonFragment(['name' => 'Mila']);
+        $response->assertJsonFragment(['name' => 'All Beings']);
     }
 
     public function test_music_suggestion_is_stored(): void
@@ -164,7 +167,8 @@ class ExampleTest extends TestCase
         $response = $this->getJson('/offerings/state?visitor_token='.self::VISITOR_TOKEN);
 
         $response->assertOk();
-        $response->assertJsonPath('lamps.0.name', 'Tenzin');
+        $response->assertJsonFragment(['name' => 'All Beings']);
+        $response->assertJsonFragment(['name' => 'Tenzin']);
         $response->assertJsonPath('mantra_total', 21);
     }
 
@@ -199,7 +203,7 @@ class ExampleTest extends TestCase
 
         $response = $this->getJson('/offerings/state');
         $response->assertJsonPath('incense.active_offerings', 1);
-        $response->assertJsonPath('lamps.0.name', 'Tenzin');
+        $response->assertJsonFragment(['name' => 'Tenzin']);
         $response->assertJsonPath('water.display_name', 'Mila');
 
         $this->travel(25)->hours();
@@ -207,8 +211,68 @@ class ExampleTest extends TestCase
         $response = $this->getJson('/offerings/state');
         $response->assertJsonPath('incense.active_offerings', 0);
         $response->assertJsonPath('incense.sticks', 2);
-        $response->assertJsonPath('lamps', []);
+        $response->assertJsonFragment(['name' => 'All Beings']);
+        $response->assertJsonMissing(['name' => 'Tenzin']);
+        $response->assertJsonMissing(['name' => 'Mila']);
         $response->assertJsonPath('water.display_name', null);
+    }
+
+    public function test_each_shrine_has_permanent_all_beings_offerings(): void
+    {
+        foreach (['/', '/amitayus', '/amitabha'] as $path) {
+            $response = $this->getJson($path === '/' ? '/offerings/state' : "{$path}/offerings/state");
+
+            $response->assertOk();
+            $response->assertJsonFragment(['name' => 'All Beings']);
+            $response->assertJsonPath('music.active.0.name', 'All Beings');
+            $response->assertJsonPath('music.active.0.track.title', 'Snow Lion by Tenzin Chogyal');
+        }
+    }
+
+    public function test_each_shrine_shares_the_same_music_catalog(): void
+    {
+        $expectedTitles = [
+            'Om Mani Pad Me Hum by zul bayar',
+            'Snow Lion by Tenzin Chogyal',
+            'Snowy Mountains – GangRi by Tenzin Choegyal & Philip Glass',
+            'Until Space Remains by Philip Glass',
+        ];
+
+        foreach (['/', '/amitayus', '/amitabha'] as $path) {
+            $response = $this->getJson($path === '/' ? '/offerings/state' : "{$path}/offerings/state");
+            $titles = collect($response->json('music.tracks'))->pluck('title')->sort()->values()->all();
+
+            $response->assertOk();
+            $this->assertSame($expectedTitles, $titles);
+        }
+    }
+
+    public function test_amitayus_shrine_page_loads(): void
+    {
+        $response = $this->get('/amitayus');
+
+        $response->assertStatus(200);
+        $response->assertSee('Namo Amitayus!');
+        $response->assertSee('Homage to the Buddha of Infinite Life!');
+        $response->assertSee('Read the Prayer');
+        $response->assertSee('A Prayer to Amitāyus', false);
+        $response->assertSee('oṃ amaraṇi jīvantaye svāhā');
+        $response->assertSee('Visit the Avalokiteśvara shrine', false);
+        $response->assertSee('Visit the Amitābha shrine', false);
+    }
+
+    public function test_amitayus_offerings_are_isolated_from_avalokiteshvara(): void
+    {
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
+        $this->postJson('/amitayus/butter-lamps', $this->visitorPayload(['name' => 'Amitayus']))->assertCreated();
+
+        $avalokiteshvara = $this->getJson('/offerings/state');
+        $avalokiteshvara->assertJsonFragment(['name' => 'Chenrezik']);
+        $avalokiteshvara->assertJsonMissing(['name' => 'Amitayus']);
+
+        $amitayus = $this->getJson('/amitayus/offerings/state');
+        $amitayus->assertJsonFragment(['name' => 'Amitayus']);
+        $amitayus->assertJsonMissing(['name' => 'Chenrezik']);
     }
 
     public function test_amitabha_shrine_page_loads(): void
@@ -216,24 +280,31 @@ class ExampleTest extends TestCase
         $response = $this->get('/amitabha');
 
         $response->assertStatus(200);
-        $response->assertSee('Namo Amitabhaya!');
+        $response->assertSee('Namo Amitabha!');
         $response->assertSee('Homage to the Buddha of Boundless Light!');
         $response->assertSee('Read the Prayer');
         $response->assertSee('Prayer to Buddha Amitābha', false);
         $response->assertSee('oṃ amitābha hrīḥ');
         $response->assertSee('Visit the Avalokiteśvara shrine', false);
+        $response->assertSee('Visit the Amitāyus shrine', false);
     }
 
-    public function test_amitabha_offerings_are_isolated_from_avalokiteshvara(): void
+    public function test_amitabha_offerings_are_isolated_from_other_shrines(): void
     {
         $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
+        $this->postJson('/amitayus/butter-lamps', $this->visitorPayload(['name' => 'Amitayus']))->assertCreated();
         $this->postJson('/amitabha/butter-lamps', $this->visitorPayload(['name' => 'Amitabha']))->assertCreated();
 
         $avalokiteshvara = $this->getJson('/offerings/state');
-        $avalokiteshvara->assertJsonPath('lamps.0.name', 'Chenrezik');
+        $avalokiteshvara->assertJsonFragment(['name' => 'Chenrezik']);
+        $avalokiteshvara->assertJsonMissing(['name' => 'Amitabha']);
+
+        $amitayus = $this->getJson('/amitayus/offerings/state');
+        $amitayus->assertJsonFragment(['name' => 'Amitayus']);
+        $amitayus->assertJsonMissing(['name' => 'Amitabha']);
 
         $amitabha = $this->getJson('/amitabha/offerings/state');
-        $amitabha->assertJsonPath('lamps.0.name', 'Amitabha');
+        $amitabha->assertJsonFragment(['name' => 'Amitabha']);
         $amitabha->assertJsonMissing(['name' => 'Chenrezik']);
     }
 }

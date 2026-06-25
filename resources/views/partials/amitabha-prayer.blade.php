@@ -1,6 +1,7 @@
 <article class="font-verse text-sm leading-relaxed text-sky-950/90 sm:text-base">
     <header class="mb-4 text-center">
-        <h3 class="text-base font-medium not-italic sm:text-lg">Prayer to Buddha Amitābha</h3>
+        <p class="text-base leading-relaxed sm:text-lg">༄༅། །འོད་དཔག་མེད་གསོལ་འདེབས།</p>
+        <h3 class="mt-2 text-base font-medium not-italic sm:text-lg">Prayer to Buddha Amitābha</h3>
         <p class="mt-1 text-xs not-italic text-sky-950/60">by the Fifteenth Karmapa, Khakhyab Dorje</p>
     </header>
 

@@ -64,6 +64,21 @@
         isolation: isolate;
     }
 
+    .deity-image-shell {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1;
+        container-type: size;
+        container-name: deity-orbit;
+    }
+
+    .deity-image-shell > .deity-image,
+    .deity-image-shell > img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
     @media (min-width: 640px) {
         .deity-hero {
             max-width: 32rem;
@@ -90,30 +105,69 @@
         backface-visibility: hidden;
     }
 
+    .deity-image--amitayus,
     .deity-image--amitabha {
         filter: drop-shadow(0 10px 28px rgba(12, 74, 110, 0.22));
     }
 
-    .deity-crosslink {
+    .deity-hero:has(.deity-image--amitayus),
+    .deity-hero:has(.deity-image--amitabha) {
+        max-width: 22rem;
+    }
+
+    @media (min-width: 640px) {
+        .deity-hero:has(.deity-image--amitayus),
+        .deity-hero:has(.deity-image--amitabha) {
+            max-width: 26rem;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .deity-hero:has(.deity-image--amitayus),
+        .deity-hero:has(.deity-image--amitabha) {
+            max-width: 30rem;
+        }
+    }
+
+    .deity-crosslink-orbit {
         position: absolute;
-        top: 8%;
-        right: 2%;
+        inset: 0;
+        z-index: 4;
+        pointer-events: none;
+    }
+
+    .deity-crosslink {
+        --crosslink-size: clamp(3.25rem, 16vw, 4.75rem);
+        --orbit-angle: 270deg;
+        --orbit-delay: 0s;
+        --orbit-radius: calc(50cqmin - var(--crosslink-size) / 2 - 0.15rem);
+        position: absolute;
+        top: 50%;
+        left: 50%;
         z-index: 4;
         display: block;
-        width: clamp(3.25rem, 16vw, 4.75rem);
+        width: var(--crosslink-size);
+        height: var(--crosslink-size);
+        margin-top: calc(var(--crosslink-size) / -2);
+        margin-left: calc(var(--crosslink-size) / -2);
         border-radius: 9999px;
         overflow: hidden;
+        pointer-events: auto;
         border: 2px solid rgba(255, 255, 255, 0.72);
         box-shadow:
             0 8px 24px rgba(0, 0, 0, 0.28),
             0 0 0 1px rgba(255, 255, 255, 0.18);
-        animation: deity-crosslink-float 5.5s ease-in-out infinite;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transform:
+            rotate(var(--orbit-angle))
+            translateX(var(--orbit-radius))
+            rotate(calc(-1 * var(--orbit-angle)));
+        animation: deity-crosslink-orbit 6.5s ease-in-out infinite;
+        animation-delay: var(--orbit-delay);
+        transition: box-shadow 0.2s ease;
     }
 
     .deity-crosslink:hover,
     .deity-crosslink:focus-visible {
-        transform: scale(1.06);
         box-shadow:
             0 12px 28px rgba(0, 0, 0, 0.32),
             0 0 18px rgba(255, 255, 255, 0.35);
@@ -122,10 +176,16 @@
     .deity-crosslink-image {
         display: block;
         width: 100%;
-        height: auto;
+        height: 100%;
         aspect-ratio: 1;
         object-fit: cover;
         background: rgba(255, 255, 255, 0.12);
+        transition: transform 0.2s ease;
+    }
+
+    .deity-crosslink:hover .deity-crosslink-image,
+    .deity-crosslink:focus-visible .deity-crosslink-image {
+        transform: scale(1.06);
     }
 
     .deity-radiance {
@@ -1353,17 +1413,29 @@
     }
 }
 
-@keyframes deity-crosslink-float {
+@keyframes deity-crosslink-orbit {
     0%,
     100% {
-        transform: translateY(0);
+        transform:
+            rotate(var(--orbit-angle))
+            translateX(var(--orbit-radius))
+            rotate(calc(-1 * var(--orbit-angle)))
+            translateY(0);
     }
     50% {
-        transform: translateY(-6px);
+        transform:
+            rotate(var(--orbit-angle))
+            translateX(calc(var(--orbit-radius) + 0.5rem))
+            rotate(calc(-1 * var(--orbit-angle)))
+            translateY(-0.35rem);
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .deity-crosslink {
+        animation: none;
+    }
+
     .merit-names-track.is-animating {
         animation: none !important;
     }

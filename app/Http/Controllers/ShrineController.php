@@ -46,20 +46,15 @@ class ShrineController extends Controller
         $this->resolveShrine($request);
         $shrine = ShrineRegistry::config($this->shrineSlug);
 
-        $lamps = $this->activeOfferingQuery(ButterLamp::class)
-            ->latest()
+        $lamps = $this->orderedOfferingQuery(ButterLamp::class)
             ->limit(200)
             ->get(['id', 'name', 'created_at']);
 
-        $flowers = $this->activeOfferingQuery(FlowerOffering::class)
-            ->latest()
+        $flowers = $this->orderedOfferingQuery(FlowerOffering::class)
             ->limit(100)
             ->get(['id', 'name', 'flower_type', 'vase_color', 'created_at']);
 
-        $dedicationNames = $lamps
-            ->pluck('name')
-            ->filter(fn (?string $name) => filled($name))
-            ->values();
+        $dedicationNames = $this->dedicationNames();
 
         $offeringNames = $this->offeringNames();
 
@@ -132,7 +127,7 @@ class ShrineController extends Controller
                 'name' => $lamp->name,
                 'created_at' => $lamp->created_at?->toIso8601String(),
             ],
-            'dedication_names' => $this->dedicationNames(),
+            'dedication_names' => $this->dedicationNames()->all(),
             'offering_names' => $this->offeringNames(),
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
             'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
@@ -164,7 +159,7 @@ class ShrineController extends Controller
                 'created_at' => $offering->created_at?->toIso8601String(),
             ],
             'total_count' => (int) $this->shrineQuery(MantraRepetition::class)->sum('count'),
-            'dedication_names' => $this->dedicationNames(),
+            'dedication_names' => $this->dedicationNames()->all(),
             'offering_names' => $this->offeringNames(),
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
             'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
@@ -407,18 +402,18 @@ class ShrineController extends Controller
     }
 
     /**
-     * @return list<string>
+     * @return \Illuminate\Support\Collection<int, string>
      */
-    private function dedicationNames(): array
+    private function dedicationNames(): \Illuminate\Support\Collection
     {
         return $this->activeOfferingQuery(ButterLamp::class)
             ->whereNotNull('name')
             ->where('name', '!=', '')
+            ->orderBy('is_permanent')
             ->orderByDesc('created_at')
             ->limit(200)
             ->pluck('name')
-            ->values()
-            ->all();
+            ->values();
     }
 
     /**
@@ -433,8 +428,7 @@ class ShrineController extends Controller
             ->orderByDesc('completed_at')
             ->first();
 
-        $lamps = $this->activeOfferingQuery(ButterLamp::class)
-            ->latest()
+        $lamps = $this->orderedOfferingQuery(ButterLamp::class)
             ->limit(200)
             ->get(['id', 'name', 'created_at'])
             ->map(fn (ButterLamp $lamp) => [
@@ -444,8 +438,7 @@ class ShrineController extends Controller
             ->values()
             ->all();
 
-        $flowers = $this->activeOfferingQuery(FlowerOffering::class)
-            ->latest()
+        $flowers = $this->orderedOfferingQuery(FlowerOffering::class)
             ->limit(100)
             ->get(['id', 'name', 'flower_type', 'vase_color', 'created_at'])
             ->map(fn (FlowerOffering $flower) => [
@@ -463,7 +456,7 @@ class ShrineController extends Controller
             'flowers' => $flowers,
             'music' => $this->formatMusicState(),
             'mantra_total' => (int) $this->shrineQuery(MantraRepetition::class)->sum('count'),
-            'dedication_names' => $this->dedicationNames(),
+            'dedication_names' => $this->dedicationNames()->all(),
             'offering_names' => $this->offeringNames(),
             'live_practitioners' => $this->livePractitionerCount(),
             'water' => [
@@ -481,11 +474,21 @@ class ShrineController extends Controller
 
     private function pruneExpiredOfferings(): void
     {
-        ButterLamp::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
-        FlowerOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        ButterLamp::query()->where('shrine', $this->shrineSlug)->where('is_permanent', false)->where('expires_at', '<=', now())->delete();
+        FlowerOffering::query()->where('shrine', $this->shrineSlug)->where('is_permanent', false)->where('expires_at', '<=', now())->delete();
         IncenseOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
-        MusicOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        MusicOffering::query()->where('shrine', $this->shrineSlug)->where('is_permanent', false)->where('expires_at', '<=', now())->delete();
         WaterBowlSession::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+    }
+
+    /**
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     */
+    private function orderedOfferingQuery(string $modelClass)
+    {
+        return $this->activeOfferingQuery($modelClass)
+            ->orderByDesc('is_permanent')
+            ->latest();
     }
 
     /**
@@ -551,9 +554,8 @@ class ShrineController extends Controller
             ->values()
             ->all();
 
-        $activeOfferings = $this->activeOfferingQuery(MusicOffering::class)
+        $activeOfferings = $this->orderedOfferingQuery(MusicOffering::class)
             ->with('track:id,youtube_id,youtube_start_seconds,title,thumbnail_url')
-            ->orderBy('created_at')
             ->get();
 
         $active = $activeOfferings
@@ -581,7 +583,7 @@ class ShrineController extends Controller
             'id' => $offering->id,
             'name' => $offering->name,
             'side' => $side,
-            'expires_at' => $offering->expires_at->toIso8601String(),
+            'expires_at' => $offering->expires_at?->toIso8601String(),
             'track' => [
                 'id' => $track->id,
                 'youtube_id' => $track->youtube_id,
@@ -595,7 +597,9 @@ class ShrineController extends Controller
 
     private function nextMusicSide(): string
     {
-        $activeCount = $this->activeOfferingQuery(MusicOffering::class)->count();
+        $activeCount = $this->activeOfferingQuery(MusicOffering::class)
+            ->where('is_permanent', false)
+            ->count();
 
         return $activeCount % 2 === 0 ? 'left' : 'right';
     }

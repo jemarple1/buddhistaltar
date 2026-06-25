@@ -9,6 +9,7 @@ class MusicOffering extends Model
 {
     protected $fillable = [
         'shrine',
+        'is_permanent',
         'music_track_id',
         'name',
         'visitor_token',
@@ -18,6 +19,7 @@ class MusicOffering extends Model
     protected function casts(): array
     {
         return [
+            'is_permanent' => 'boolean',
             'expires_at' => 'datetime',
         ];
     }

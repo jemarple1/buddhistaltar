@@ -53,4 +53,53 @@ class ShrineRegistry
             'heartbeatPath' => '/practitioner-presence',
         ];
     }
+
+    /**
+     * @return list<array{url: string, image: string, label: string, orbit_angle: float, orbit_delay: float}>
+     */
+    public static function crosslinksFor(string $slug): array
+    {
+        $others = array_values(array_filter(
+            self::slugs(),
+            static fn (string $otherSlug): bool => $otherSlug !== $slug,
+        ));
+
+        $count = count($others);
+
+        if ($count === 0) {
+            return [];
+        }
+
+        $startAngle = 215.0;
+        $endAngle = 325.0;
+        $crosslinks = [];
+
+        foreach ($others as $index => $otherSlug) {
+            $config = self::config($otherSlug);
+            $prefix = (string) $config['route_prefix'];
+            $angle = $count === 1
+                ? 270.0
+                : $startAngle + ($index * ($endAngle - $startAngle) / ($count - 1));
+
+            $crosslinks[] = [
+                'url' => $prefix === '' ? '/' : '/'.trim($prefix, '/'),
+                'image' => (string) $config['deity_image'],
+                'label' => 'Visit the '.self::crosslinkDisplayName($otherSlug).' shrine',
+                'orbit_angle' => $angle,
+                'orbit_delay' => $index * -2.75,
+            ];
+        }
+
+        return $crosslinks;
+    }
+
+    public static function crosslinkDisplayName(string $slug): string
+    {
+        return match ($slug) {
+            'avalokiteshvara' => 'Avalokiteśvara',
+            'amitayus' => 'Amitāyus',
+            'amitabha' => 'Amitābha',
+            default => ucfirst($slug),
+        };
+    }
 }

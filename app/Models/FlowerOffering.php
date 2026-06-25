@@ -8,6 +8,7 @@ class FlowerOffering extends Model
 {
     protected $fillable = [
         'shrine',
+        'is_permanent',
         'name',
         'visitor_token',
         'flower_type',
@@ -18,6 +19,7 @@ class FlowerOffering extends Model
     protected function casts(): array
     {
         return [
+            'is_permanent' => 'boolean',
             'expires_at' => 'datetime',
         ];
     }

@@ -17,10 +17,11 @@
     @vite(['resources/css/app.css', 'resources/js/shrine.js'])
 </head>
 @php
+    use App\Support\ShrineRegistry;
+
     $deityImagePath = public_path($shrine['deity_image']);
     $deityImageVersion = file_exists($deityImagePath) ? filemtime($deityImagePath) : time();
-    $crosslinkImagePath = isset($shrine['crosslink']['image']) ? public_path($shrine['crosslink']['image']) : null;
-    $crosslinkImageVersion = $crosslinkImagePath && file_exists($crosslinkImagePath) ? filemtime($crosslinkImagePath) : time();
+    $crosslinks = ShrineRegistry::crosslinksFor($shrine['slug']);
 @endphp
 <body class="{{ $shrine['body_class'] }} min-h-screen text-sky-950 antialiased">
     @if ($shrine['show_sky_clouds'])
@@ -34,33 +35,44 @@
     <div class="relative flex min-h-screen flex-col overflow-x-hidden">
         <div class="light-rays" aria-hidden="true"></div>
 
-        <header class="relative z-10 flex flex-1 flex-col items-center pb-4">
+        <header class="relative z-10 flex flex-1 flex-col items-center pb-4 pt-6 sm:pt-10 md:pt-12">
             <div class="deity-hero w-full">
-                <img
-                    src="{{ asset($shrine['deity_image']) }}?v={{ $deityImageVersion }}"
-                    alt="{{ $shrine['deity_alt'] }}"
-                    width="1024"
-                    height="1024"
-                    class="{{ $shrine['deity_image_class'] }}"
-                    loading="eager"
-                    decoding="async"
-                >
-                @if (! empty($shrine['crosslink']))
-                    <a
-                        href="{{ url($shrine['crosslink']['url']) }}"
-                        class="deity-crosslink"
-                        aria-label="{{ $shrine['crosslink']['label'] }}"
-                        title="{{ $shrine['crosslink']['label'] }}"
+                <div class="deity-image-shell">
+                    <img
+                        src="{{ asset($shrine['deity_image']) }}?v={{ $deityImageVersion }}"
+                        alt="{{ $shrine['deity_alt'] }}"
+                        width="1024"
+                        height="1024"
+                        class="{{ $shrine['deity_image_class'] }}"
+                        loading="eager"
+                        decoding="async"
                     >
-                        <img
-                            src="{{ asset($shrine['crosslink']['image']) }}?v={{ $crosslinkImageVersion }}"
-                            alt=""
-                            class="deity-crosslink-image"
-                            loading="lazy"
-                            decoding="async"
-                        >
-                    </a>
-                @endif
+                    @if ($crosslinks !== [])
+                        <div class="deity-crosslink-orbit">
+                            @foreach ($crosslinks as $crosslink)
+                                @php
+                                    $crosslinkImagePath = public_path($crosslink['image']);
+                                    $crosslinkImageVersion = file_exists($crosslinkImagePath) ? filemtime($crosslinkImagePath) : time();
+                                @endphp
+                                <a
+                                    href="{{ url($crosslink['url']) }}"
+                                    class="deity-crosslink"
+                                    style="--orbit-angle: {{ $crosslink['orbit_angle'] }}deg; --orbit-delay: {{ $crosslink['orbit_delay'] }}s;"
+                                    aria-label="{{ $crosslink['label'] }}"
+                                    title="{{ $crosslink['label'] }}"
+                                >
+                                    <img
+                                        src="{{ asset($crosslink['image']) }}?v={{ $crosslinkImageVersion }}"
+                                        alt=""
+                                        class="deity-crosslink-image"
+                                        loading="lazy"
+                                        decoding="async"
+                                    >
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </div>
 
             <div class="deity-title-row mt-4 px-4">

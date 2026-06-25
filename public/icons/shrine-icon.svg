@@ -38,8 +38,8 @@
     </filter>
   </defs>
   <rect width="512" height="512" fill="url(#sky)"/>
-  <ellipse cx="256" cy="430" rx="118" ry="24" fill="#000" opacity="0.16"/>
-  <g transform="translate(256 300) scale(4.2)">
+  <ellipse cx="256" cy="462" rx="131" ry="28" fill="#000" opacity="0.16"/>
+  <g transform="translate(256 198) scale(7.73)">
     <ellipse cx="0" cy="34" rx="17" ry="3.5" fill="#000" opacity="0.22"/>
     <path d="M-15 14 C-17 28 -13 32 0 32 C13 32 17 28 15 14 Z" fill="url(#bronze)" stroke="#3d2e08" stroke-width="0.75"/>
     <path d="M-13 14 Q0 9 13 14" fill="none" stroke="url(#rim)" stroke-width="1.7"/>
