@@ -45,13 +45,15 @@ return new class extends Migration
     public function up(): void
     {
         foreach (['butter_lamps', 'flower_offerings', 'music_offerings'] as $table) {
-            Schema::table($table, function (Blueprint $table) {
-                $table->boolean('is_permanent')->default(false)->after('shrine');
-            });
+            if (! Schema::hasColumn($table, 'is_permanent')) {
+                Schema::table($table, function (Blueprint $table) {
+                    $table->boolean('is_permanent')->default(false)->after('shrine');
+                });
+            }
         }
 
         $now = now();
-        $neverExpires = $now->copy()->addYears(100);
+        $neverExpires = '2037-12-31 23:59:59';
 
         foreach (self::SHRINES as $shrine) {
             foreach (self::MUSIC_CATALOG as $track) {

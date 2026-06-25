@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class PermanentOfferings
@@ -12,10 +13,18 @@ class PermanentOfferings
 
     public const SNOW_LION_START_SECONDS = 798;
 
+    /** MySQL TIMESTAMP columns cannot store dates beyond 2038. */
+    public const FAR_FUTURE_EXPIRES_AT = '2037-12-31 23:59:59';
+
+    public static function farFutureExpiresAt(): Carbon
+    {
+        return Carbon::parse(self::FAR_FUTURE_EXPIRES_AT);
+    }
+
     public static function ensureForShrine(string $shrine): void
     {
         $now = now();
-        $neverExpires = $now->copy()->addYears(100);
+        $neverExpires = self::farFutureExpiresAt();
 
         DB::table('music_tracks')
             ->where('shrine', $shrine)
