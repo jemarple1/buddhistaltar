@@ -47,10 +47,13 @@ class ShrineRegistry
     {
         $config = self::config($slug);
 
+        $vapidPublicKey = config('services.webpush.public_key');
+
         return [
             'slug' => $config['slug'],
             'apiBase' => self::apiBase($slug),
             'heartbeatPath' => '/practitioner-presence',
+            'vapidPublicKey' => is_string($vapidPublicKey) && $vapidPublicKey !== '' ? $vapidPublicKey : null,
         ];
     }
 

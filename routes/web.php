@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\ShrineController;
 use App\Support\ShrineRegistry;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,7 @@ foreach (ShrineRegistry::slugs() as $slug) {
         Route::post('/music-offerings', [ShrineController::class, 'storeMusic'])->defaults('shrine', $slug);
         Route::post('/music-suggestions', [ShrineController::class, 'storeMusicSuggestion'])->defaults('shrine', $slug);
         Route::post('/water-offerings', [ShrineController::class, 'storeWater'])->defaults('shrine', $slug);
+        Route::post('/push-subscriptions', [PushSubscriptionController::class, 'store'])->defaults('shrine', $slug);
     };
 
     if ($prefix === '') {

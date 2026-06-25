@@ -69,7 +69,13 @@ const LIVE_PRACTITIONERS_COUNT_ID = 'live-practitioners-count';
 const SHRINE_POLL_MS = 4000;
 const COOKIE_CONSENT_KEY = `shrine_cookies_accepted_${SHRINE_SLUG}`;
 const REFUGE_DISMISSED_KEY = `shrine_refuge_dismissed_${SHRINE_SLUG}`;
+const INSTALL_PROMPT_DISMISSED_KEY = 'buddhist_altar_install_dismissed';
+const NOTIFICATIONS_ENABLED_KEY = 'buddhist_altar_notifications_enabled';
 const COOKIE_CONSENT_ID = 'cookie-consent';
+const INSTALL_PROMPT_ID = 'install-prompt';
+const INSTALL_PROMPT_INSTRUCTIONS_ID = 'install-prompt-instructions';
+const INSTALL_ENABLE_NOTIFICATIONS_ID = 'install-enable-notifications';
+const BTN_DISMISS_INSTALL_ID = 'btn-dismiss-install';
 const REFUGE_MODAL_ID = 'refuge-modal';
 const DEDICATION_MODAL_ID = 'dedication-modal';
 const BTN_ACCEPT_COOKIES_ID = 'btn-accept-cookies';
@@ -97,6 +103,8 @@ let syllableLampRayInterval = null;
 let statePollInterval = null;
 let shrinePollInterval = null;
 let practitionerHeartbeatInterval = null;
+let visitorOfferingTimers = new Map();
+let notifiedVisitorOfferings = new Set();
 
 const CLOUD_TARGET_BASE = 36;
 const CLOUD_TARGET_PER_STICK = 14;
@@ -218,6 +226,7 @@ function applyShrineState() {
     populateMeritNamesCarousel(shrineState.offering_names ?? []);
     updateLivePractitioners(shrineState.live_practitioners ?? 0);
     updateMantraTotal(shrineState.mantra_total ?? 0);
+    syncVisitorOfferingNotifications(shrineState.visitor_offerings ?? []);
     renderDedication(shrineState.dedication_names ?? []);
 }
 
@@ -1593,19 +1602,218 @@ function acceptCookies() {
     localStorage.setItem(COOKIE_CONSENT_KEY, '1');
 
     const banner = document.getElementById(COOKIE_CONSENT_ID);
-    if (!banner) {
+    if (banner) {
+        banner.hidden = true;
+        banner.setAttribute('aria-hidden', 'true');
+    }
+
+    maybeShowInstallPrompt();
+}
+
+function isStandaloneApp() {
+    return (
+        window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true
+    );
+}
+
+function installPromptInstructions() {
+    const ua = navigator.userAgent;
+    const isIos = /iPad|iPhone|iPod/.test(ua)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/.test(ua);
+
+    if (isIos) {
+        return 'In Safari, tap the Share button at the bottom center (square with an arrow pointing up), then choose “Add to Home Screen”.';
+    }
+
+    if (isAndroid) {
+        return 'Open the browser menu (⋮) and tap “Install app” or “Add to Home screen”.';
+    }
+
+    return 'Use your browser menu to install this site as an app, or add it to your home screen.';
+}
+
+function maybeShowInstallPrompt() {
+    if (
+        !localStorage.getItem(COOKIE_CONSENT_KEY)
+        || localStorage.getItem(INSTALL_PROMPT_DISMISSED_KEY)
+        || isStandaloneApp()
+    ) {
         return;
     }
 
-    banner.hidden = true;
-    banner.setAttribute('aria-hidden', 'true');
+    const prompt = document.getElementById(INSTALL_PROMPT_ID);
+    const instructions = document.getElementById(INSTALL_PROMPT_INSTRUCTIONS_ID);
+
+    if (!prompt) {
+        return;
+    }
+
+    if (instructions) {
+        instructions.textContent = installPromptInstructions();
+    }
+
+    prompt.hidden = false;
+    prompt.setAttribute('aria-hidden', 'false');
+}
+
+function dismissInstallPrompt() {
+    localStorage.setItem(INSTALL_PROMPT_DISMISSED_KEY, '1');
+
+    const prompt = document.getElementById(INSTALL_PROMPT_ID);
+    if (prompt) {
+        prompt.hidden = true;
+        prompt.setAttribute('aria-hidden', 'true');
+    }
+
+    const enableNotifications = document.getElementById(INSTALL_ENABLE_NOTIFICATIONS_ID);
+    if (enableNotifications?.checked) {
+        localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '1');
+        registerForPushNotifications();
+    }
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; i += 1) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+
+    return outputArray;
+}
+
+async function registerForPushNotifications() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        return;
+    }
+
+    const vapidPublicKey = shrineClient.vapidPublicKey;
+    if (!vapidPublicKey) {
+        return;
+    }
+
+    try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+
+        let permission = Notification.permission;
+        if (permission === 'default') {
+            permission = await Notification.requestPermission();
+        }
+
+        if (permission !== 'granted') {
+            return;
+        }
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+            });
+        }
+
+        await fetch(apiUrl('/push-subscriptions'), {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                visitor_token: getVisitorToken(),
+                subscription: subscription.toJSON(),
+            }),
+        });
+    } catch {
+        // push is optional; ignore registration failures
+    }
+}
+
+function showOfferingExpiredNotification(label) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') {
+        return;
+    }
+
+    const title = 'Offering ended';
+    const body = `Your ${label} has ended after 24 hours.`;
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+            .then((registration) => registration.showNotification(title, {
+                body,
+                icon: '/icons/icon-192.png',
+                tag: `offering-expired-${label}`,
+            }))
+            .catch(() => {
+                new Notification(title, { body, icon: '/icons/icon-192.png' });
+            });
+        return;
+    }
+
+    new Notification(title, { body, icon: '/icons/icon-192.png' });
+}
+
+function syncVisitorOfferingNotifications(offerings) {
+    if (!localStorage.getItem(NOTIFICATIONS_ENABLED_KEY)) {
+        return;
+    }
+
+    const activeKeys = new Set();
+
+    for (const offering of offerings) {
+        if (!offering?.expires_at || !offering?.type || !offering?.id) {
+            continue;
+        }
+
+        const key = `${offering.type}:${offering.id}`;
+        activeKeys.add(key);
+
+        if (visitorOfferingTimers.has(key) || notifiedVisitorOfferings.has(key)) {
+            continue;
+        }
+
+        const expiresAt = new Date(offering.expires_at).getTime();
+        const delay = expiresAt - Date.now();
+
+        if (Number.isNaN(expiresAt) || delay <= 0) {
+            continue;
+        }
+
+        const timerId = window.setTimeout(() => {
+            visitorOfferingTimers.delete(key);
+            notifiedVisitorOfferings.add(key);
+            showOfferingExpiredNotification(offering.label ?? 'offering');
+        }, delay);
+
+        visitorOfferingTimers.set(key, timerId);
+    }
+
+    for (const [key, timerId] of visitorOfferingTimers.entries()) {
+        if (!activeKeys.has(key)) {
+            window.clearTimeout(timerId);
+            visitorOfferingTimers.delete(key);
+        }
+    }
 }
 
 function initFirstVisitPrompts() {
     showCookieConsent();
 
+    if (localStorage.getItem(COOKIE_CONSENT_KEY)) {
+        maybeShowInstallPrompt();
+    }
+
     if (!localStorage.getItem(REFUGE_DISMISSED_KEY)) {
         openRefugeModal();
+    }
+
+    if (localStorage.getItem(NOTIFICATIONS_ENABLED_KEY)) {
+        registerForPushNotifications();
     }
 }
 
@@ -2016,6 +2224,7 @@ document.querySelectorAll('[data-close-sutra]').forEach((element) => {
 });
 
 document.getElementById(BTN_ACCEPT_COOKIES_ID)?.addEventListener('click', acceptCookies);
+document.getElementById(BTN_DISMISS_INSTALL_ID)?.addEventListener('click', dismissInstallPrompt);
 document.getElementById(BTN_CLOSE_REFUGE_ID)?.addEventListener('click', closeRefugeModal);
 document.querySelectorAll('[data-close-refuge]').forEach((element) => {
     element.addEventListener('click', closeRefugeModal);

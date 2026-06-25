@@ -1,6 +1,6 @@
 {
-    "name": "Shrine Offerings",
-    "short_name": "Shrine",
+    "name": "Buddhist Altar",
+    "short_name": "Buddhist Altar",
     "description": "Offer butter lamps, incense, water, flowers, and music before the shrine.",
     "start_url": "/",
     "scope": "/",

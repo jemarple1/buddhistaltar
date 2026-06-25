@@ -162,6 +162,44 @@ class OfferingGuard
     }
 
     /**
+     * @return list<array{type: string, id: int, expires_at: string, label: string}>
+     */
+    public static function visitorOfferingsFor(string $visitorToken, string $shrine = 'avalokiteshvara'): array
+    {
+        $types = [
+            'lamp' => [ButterLamp::class, 'butter lamp offering'],
+            'flower' => [FlowerOffering::class, 'flower offering'],
+            'incense' => [IncenseOffering::class, 'incense offering'],
+            'music' => [MusicOffering::class, 'music offering'],
+            'water' => [WaterBowlSession::class, 'water offering'],
+        ];
+
+        $offerings = [];
+
+        foreach ($types as $type => [$modelClass, $label]) {
+            $rows = self::applyActiveScope(
+                self::visitorOfferingQuery($modelClass, $visitorToken, $shrine),
+                $modelClass,
+            )->get(['id', 'expires_at']);
+
+            foreach ($rows as $row) {
+                if ($row->expires_at === null) {
+                    continue;
+                }
+
+                $offerings[] = [
+                    'type' => $type,
+                    'id' => (int) $row->id,
+                    'expires_at' => $row->expires_at->toIso8601String(),
+                    'label' => $label,
+                ];
+            }
+        }
+
+        return $offerings;
+    }
+
+    /**
      * @param  class-string<Model>  $modelClass
      * @return Builder<Model>
      */

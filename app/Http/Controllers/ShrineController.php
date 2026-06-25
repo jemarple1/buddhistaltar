@@ -477,6 +477,7 @@ class ShrineController extends Controller
 
         if ($visitorToken !== null) {
             $state['visitor_limits'] = OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug);
+            $state['visitor_offerings'] = OfferingGuard::visitorOfferingsFor($visitorToken, $this->shrineSlug);
         }
 
         return $state;

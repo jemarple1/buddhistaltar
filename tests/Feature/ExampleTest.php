@@ -53,6 +53,9 @@ class ExampleTest extends TestCase
         $response->assertSee('Offer music');
         $response->assertSee('Visit the Amitāyus shrine', false);
         $response->assertSee('Visit the Amitābha shrine', false);
+        $response->assertSee('Buddhist Altar', false);
+        $response->assertSee('Add Buddhist Altar to your home screen', false);
+        $response->assertSee('Remind me when my offerings expire', false);
     }
 
     public function test_a_butter_lamp_can_be_offered(): void
@@ -337,5 +340,57 @@ class ExampleTest extends TestCase
         $amitabha = $this->getJson('/amitabha/offerings/state');
         $amitabha->assertJsonFragment(['name' => 'Amitabha']);
         $amitabha->assertJsonMissing(['name' => 'Chenrezik']);
+    }
+
+    public function test_offerings_state_includes_visitor_offerings_for_token(): void
+    {
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+
+        $response = $this->getJson('/offerings/state?'.http_build_query([
+            'visitor_token' => self::VISITOR_TOKEN,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'visitor_offerings');
+        $response->assertJsonPath('visitor_offerings.0.type', 'lamp');
+        $response->assertJsonPath('visitor_offerings.0.label', 'butter lamp offering');
+    }
+
+    public function test_push_subscription_can_be_stored(): void
+    {
+        $response = $this->postJson('/push-subscriptions', [
+            'visitor_token' => self::VISITOR_TOKEN,
+            'subscription' => [
+                'endpoint' => 'https://push.example.test/subscription/1',
+                'keys' => [
+                    'p256dh' => 'test-public-key',
+                    'auth' => 'test-auth-token',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('ok', true);
+
+        $this->assertDatabaseHas('push_subscriptions', [
+            'visitor_token' => self::VISITOR_TOKEN,
+            'shrine' => 'avalokiteshvara',
+            'endpoint' => 'https://push.example.test/subscription/1',
+        ]);
+    }
+
+    public function test_expiry_notifier_records_sent_notifications_without_vapid_keys(): void
+    {
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+
+        DB::table('butter_lamps')
+            ->where('name', 'Tenzin')
+            ->update(['expires_at' => Carbon::now()->subMinute()]);
+
+        $this->artisan('offerings:notify-expired')->assertSuccessful();
+
+        $this->assertDatabaseMissing('offering_expiry_notifications', [
+            'offering_type' => 'lamp',
+        ]);
     }
 }

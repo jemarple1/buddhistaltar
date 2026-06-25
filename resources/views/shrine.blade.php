@@ -8,7 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Shrine Offerings">
+    <meta name="apple-mobile-web-app-title" content="Buddhist Altar">
     <title>{{ $shrine['page_title'] }}</title>
     <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('icons/favicon.png') }}">
@@ -250,6 +250,19 @@
     <div id="cookie-consent" class="cookie-consent" hidden aria-hidden="true" role="dialog" aria-labelledby="cookie-consent-title">
         <p id="cookie-consent-title" class="cookie-consent-text">This site uses cookies and local storage to remember your preferences and offering session.</p>
         <button type="button" id="btn-accept-cookies" class="btn-shrine cookie-consent-btn">Accept</button>
+    </div>
+
+    <div id="install-prompt" class="install-prompt" hidden aria-hidden="true" role="dialog" aria-labelledby="install-prompt-title">
+        <div class="install-prompt-header">
+            <img src="{{ asset('icons/icon-192.png') }}" alt="" class="install-prompt-icon" width="48" height="48">
+            <p id="install-prompt-title" class="install-prompt-title">Add Buddhist Altar to your home screen</p>
+        </div>
+        <p id="install-prompt-instructions" class="install-prompt-text"></p>
+        <label class="install-prompt-checkbox">
+            <input type="checkbox" id="install-enable-notifications">
+            <span>Remind me when my offerings expire</span>
+        </label>
+        <button type="button" id="btn-dismiss-install" class="btn-shrine install-prompt-btn">Got it</button>
     </div>
 
     <button type="button" id="btn-open-dedication" class="dedicate-merit-fab btn-shrine" aria-haspopup="dialog" aria-controls="dedication-modal">
