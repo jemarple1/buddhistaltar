@@ -31,15 +31,17 @@
             </div>
 
             <div class="deity-title-row mt-4 px-4">
-                <div class="incense-shrine hidden" aria-label="Burning incense offering on the left"></div>
+                <div class="incense-shrine" aria-label="Burning incense offering on the left"></div>
 
                 <div class="deity-title">
                     <h1 class="text-xl font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">Avalokiteshvara</h1>
                     <p class="mt-1 text-sm italic text-white/85 drop-shadow-sm">Lord of Great Compassion</p>
                 </div>
 
-                <div class="incense-shrine hidden" aria-label="Burning incense offering on the right"></div>
+                <div class="incense-shrine" aria-label="Burning incense offering on the right"></div>
             </div>
+
+            <div id="incense-shrine-extra" class="incense-shrine-extra hidden" aria-label="Additional incense offerings"></div>
 
             <div id="shrine-altar" class="shrine-altar mt-6 px-4">
                 <div class="altar-row altar-row-water">
@@ -83,7 +85,7 @@
                         {{-- Incense --}}
                         <div class="offering-column">
                             <h3 class="offering-column-title">Incense</h3>
-                            <p class="offering-column-desc">Burns for fifteen minutes</p>
+                            <p class="offering-column-desc">Adds a stick for fifteen minutes</p>
                             <div class="offering-preview incense-preview"></div>
                             <input type="text" id="incense-name" maxlength="100" placeholder="Name (optional)" class="name-input mt-4 w-full rounded px-3 py-2 text-sm italic">
                             <button type="button" id="btn-offer-incense" class="btn-shrine mt-3 w-full rounded px-4 py-2.5 text-sm tracking-wide">Offer incense</button>
@@ -157,6 +159,13 @@
                         </div>
                     </div>
                 </section>
+            </div>
+
+            <div class="live-practitioners-bar mx-auto mt-8 max-w-7xl border-t border-sky-900/10 px-4 pt-5 pb-2 text-center">
+                <p class="text-xs tracking-[0.2em] uppercase text-sky-950/55">Live practitioners</p>
+                <p class="mt-1 text-2xl font-medium tabular-nums text-sky-950">
+                    <span id="live-practitioners-count">0</span>
+                </p>
             </div>
         </footer>
     </div>

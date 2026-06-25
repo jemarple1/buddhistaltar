@@ -11,3 +11,4 @@ Route::post('/incense-offerings', [ShrineController::class, 'storeIncense']);
 Route::post('/flower-offerings', [ShrineController::class, 'storeFlower']);
 Route::post('/water-bowls/acquire', [ShrineController::class, 'acquireWaterLock']);
 Route::post('/water-bowls/fill', [ShrineController::class, 'fillWaterBowl']);
+Route::post('/practitioner-presence', [ShrineController::class, 'heartbeat']);

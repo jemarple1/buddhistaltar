@@ -6,6 +6,7 @@ use App\Models\ButterLamp;
 use App\Models\FlowerOffering;
 use App\Models\IncenseOffering;
 use App\Models\MantraRepetition;
+use App\Models\PractitionerPresence;
 use App\Models\WaterBowlSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,6 +58,24 @@ class ShrineController extends Controller
     public function state(): JsonResponse
     {
         return response()->json($this->buildShrineState());
+    }
+
+    public function heartbeat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'uuid'],
+        ]);
+
+        PractitionerPresence::query()->updateOrInsert(
+            ['session_token' => $validated['token']],
+            ['last_seen_at' => now()],
+        );
+
+        $this->pruneStalePractitionerPresences();
+
+        return response()->json([
+            'live_practitioners' => $this->livePractitionerCount(),
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -304,10 +323,6 @@ class ShrineController extends Controller
     {
         $this->expireStaleWaterSessions();
 
-        $incenseExpiresAt = IncenseOffering::query()
-            ->where('expires_at', '>', now())
-            ->max('expires_at');
-
         $activeWater = WaterBowlSession::query()
             ->whereNull('completed_at')
             ->where('expires_at', '>', now())
@@ -334,11 +349,10 @@ class ShrineController extends Controller
             ->all();
 
         return [
-            'incense_expires_at' => $incenseExpiresAt
-                ? Carbon::parse($incenseExpiresAt)->toIso8601String()
-                : null,
+            'incense' => $this->formatIncenseState(),
             'flowers' => $flowers,
             'offering_names' => $this->offeringNames(),
+            'live_practitioners' => $this->livePractitionerCount(),
             'water' => [
                 'display_positions' => $displayWater?->filled_positions ?? [],
                 'active' => $activeWater !== null,
@@ -366,6 +380,42 @@ class ShrineController extends Controller
         WaterBowlSession::query()
             ->whereNull('completed_at')
             ->where('expires_at', '<=', now())
+            ->delete();
+    }
+
+    /**
+     * @return array{sticks: int, active_offerings: int, expires_at: string|null}
+     */
+    private function formatIncenseState(): array
+    {
+        $activeOfferings = IncenseOffering::query()
+            ->where('expires_at', '>', now())
+            ->count();
+
+        $expiresAt = IncenseOffering::query()
+            ->where('expires_at', '>', now())
+            ->max('expires_at');
+
+        return [
+            'sticks' => 1 + $activeOfferings,
+            'active_offerings' => $activeOfferings,
+            'expires_at' => $expiresAt
+                ? Carbon::parse($expiresAt)->toIso8601String()
+                : null,
+        ];
+    }
+
+    private function livePractitionerCount(): int
+    {
+        return PractitionerPresence::query()
+            ->where('last_seen_at', '>=', now()->subMinutes(30))
+            ->count();
+    }
+
+    private function pruneStalePractitionerPresences(): void
+    {
+        PractitionerPresence::query()
+            ->where('last_seen_at', '<', now()->subMinutes(30))
             ->delete();
     }
 }

@@ -36,6 +36,7 @@ class ExampleTest extends TestCase
         $response->assertSee('Read the Sutra');
         $response->assertSee('The Dhāraṇī of Noble Avalokiteśvara');
         $response->assertSee('Mantra Repetitions');
+        $response->assertSee('Live practitioners');
     }
 
     public function test_a_butter_lamp_can_be_offered(): void
@@ -60,11 +61,28 @@ class ExampleTest extends TestCase
         $response->assertJsonPath('total_count', 115);
     }
 
-    public function test_incense_offering_sets_expiry(): void
+    public function test_incense_offering_adds_stick_and_sets_expiry(): void
     {
         $response = $this->postJson('/incense-offerings', ['name' => 'Sam']);
         $response->assertCreated();
         $response->assertJsonStructure(['offering' => ['expires_at'], 'shrine_state']);
+        $response->assertJsonPath('shrine_state.incense.sticks', 2);
+        $response->assertJsonPath('shrine_state.incense.active_offerings', 1);
+    }
+
+    public function test_practitioner_heartbeat_returns_live_count(): void
+    {
+        $token = '550e8400-e29b-41d4-a716-446655440000';
+
+        $response = $this->postJson('/practitioner-presence', ['token' => $token]);
+        $response->assertOk();
+        $response->assertJsonPath('live_practitioners', 1);
+
+        $response = $this->postJson('/practitioner-presence', [
+            'token' => '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+        ]);
+        $response->assertOk();
+        $response->assertJsonPath('live_practitioners', 2);
     }
 
     public function test_water_offering_locks_for_one_person_at_a_time(): void

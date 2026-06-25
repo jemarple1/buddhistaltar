@@ -30,7 +30,9 @@ const BTN_CLOSE_LAMP_MODAL_ID = 'btn-close-lamp-modal';
 const BTN_OFFER_INCENSE_ID = 'btn-offer-incense';
 const BTN_OFFER_FLOWER_ID = 'btn-offer-flower';
 const BTN_BEGIN_WATER_ID = 'btn-begin-water';
-const INCENSE_SHRINE_SELECTOR = '.deity-title-row .incense-shrine';
+const INCENSE_SHRINE_SELECTOR = '.deity-title-row .incense-shrine, #incense-shrine-extra .incense-shrine';
+const INCENSE_SHRINE_EXTRA_ID = 'incense-shrine-extra';
+const MAX_STICKS_PER_HOLDER = 3;
 const SYLLABLE_SMOKE_ID = 'syllable-smoke';
 const WATER_STACK_ID = 'water-bowls-stack';
 const WATER_ACTIVE_ID = 'water-bowls-active';
@@ -38,6 +40,8 @@ const WATER_STATUS_ID = 'water-status';
 const OFFERED_WATER_ID = 'offered-water-bowls';
 const WATER_PITCHER_ID = 'water-pitcher';
 const WATER_TOKEN_KEY = 'shrine_water_token';
+const PRACTITIONER_TOKEN_KEY = 'shrine_practitioner_token';
+const LIVE_PRACTITIONERS_COUNT_ID = 'live-practitioners-count';
 const COOKIE_CONSENT_KEY = 'shrine_cookies_accepted';
 const REFUGE_DISMISSED_KEY = 'shrine_refuge_dismissed';
 const COOKIE_CONSENT_ID = 'cookie-consent';
@@ -65,16 +69,25 @@ let offeredLamps = [];
 let waterToken = sessionStorage.getItem(WATER_TOKEN_KEY);
 let syllableCloudInterval = null;
 let syllableRiseInterval = null;
-let syllableTimeout = null;
 let statePollInterval = null;
+let practitionerHeartbeatInterval = null;
 
-const CLOUD_TARGET = 95;
+const CLOUD_TARGET_BASE = 36;
+const CLOUD_TARGET_PER_STICK = 14;
 const CLOUD_BAND_TOP = 0.03;
 const CLOUD_BAND_HEIGHT = 0.34;
-const CLOUD_FILL_MS = 90000;
-const INCENSE_BURN_MS = 15 * 60 * 1000;
+const CLOUD_FILL_MS_BASE = 120000;
+const CLOUD_FILL_MS_PER_STICK = -8000;
+const RISE_INTERVAL_BASE = 420;
+const RISE_INTERVAL_PER_STICK = 28;
+const RISE_INTERVAL_MIN = 110;
+const CLOUD_MAINTAIN_BASE = 950;
+const CLOUD_MAINTAIN_PER_STICK = 55;
+const CLOUD_MAINTAIN_MIN = 450;
 
 let syllableSmokeStartedAt = 0;
+let currentIncenseSticks = 1;
+let syllableSmokeRunning = false;
 
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -121,33 +134,115 @@ function renderDedication(names) {
 }
 
 function applyShrineState() {
-    updateIncenseDisplay(shrineState.incense_expires_at);
+    updateIncenseDisplay(shrineState.incense);
     renderFlowers(shrineState.flowers ?? []);
     applyWaterState(shrineState.water ?? {});
     populateMeritNamesCarousel(shrineState.offering_names ?? []);
+    updateLivePractitioners(shrineState.live_practitioners ?? 0);
 }
 
-function getIncenseShrines() {
-    return [...document.querySelectorAll(INCENSE_SHRINE_SELECTOR)];
+function incenseStickCount(incense) {
+    if (typeof incense === 'object' && incense !== null && typeof incense.sticks === 'number') {
+        return Math.max(1, incense.sticks);
+    }
+
+    return 1;
 }
 
-function updateIncenseDisplay(expiresAt) {
-    const shrines = getIncenseShrines();
-    if (!shrines.length) {
-        return;
+function getCloudTargetMax() {
+    return CLOUD_TARGET_BASE + currentIncenseSticks * CLOUD_TARGET_PER_STICK;
+}
+
+function getCloudFillMs() {
+    return Math.max(45000, CLOUD_FILL_MS_BASE + currentIncenseSticks * CLOUD_FILL_MS_PER_STICK);
+}
+
+function getRiseIntervalMs() {
+    return Math.max(RISE_INTERVAL_MIN, RISE_INTERVAL_BASE - currentIncenseSticks * RISE_INTERVAL_PER_STICK);
+}
+
+function getCloudMaintainMs() {
+    return Math.max(CLOUD_MAINTAIN_MIN, CLOUD_MAINTAIN_BASE - currentIncenseSticks * CLOUD_MAINTAIN_PER_STICK);
+}
+
+function incenseHolderCount(sticks) {
+    if (sticks <= MAX_STICKS_PER_HOLDER) {
+        return 2;
     }
 
-    if (!expiresAt || new Date(expiresAt) <= new Date()) {
-        shrines.forEach((shrine) => shrine.classList.add('hidden'));
-        stopSyllableSmoke();
-        return;
+    return Math.max(3, Math.ceil(sticks / MAX_STICKS_PER_HOLDER));
+}
+
+function distributeIncenseSticks(totalSticks, holderCount) {
+    const counts = Array(holderCount).fill(0);
+    let remaining = totalSticks;
+    let index = 0;
+
+    while (remaining > 0) {
+        if (counts[index] < MAX_STICKS_PER_HOLDER) {
+            counts[index]++;
+            remaining--;
+        }
+
+        index = (index + 1) % holderCount;
     }
 
-    shrines.forEach((shrine) => {
-        shrine.classList.remove('hidden');
-        shrine.innerHTML = incenseSvg({ lit: true });
+    return counts;
+}
+
+function ensureIncenseHolderElements(holderCount) {
+    const extraContainer = document.getElementById(INCENSE_SHRINE_EXTRA_ID);
+    const primary = [...document.querySelectorAll('.deity-title-row .incense-shrine')];
+    const extrasNeeded = Math.max(0, holderCount - primary.length);
+    const extras = extraContainer ? [...extraContainer.querySelectorAll('.incense-shrine')] : [];
+
+    if (extraContainer) {
+        while (extras.length < extrasNeeded) {
+            const shrine = document.createElement('div');
+            shrine.className = 'incense-shrine';
+            shrine.setAttribute('aria-label', 'Burning incense offering');
+            extraContainer.appendChild(shrine);
+            extras.push(shrine);
+        }
+
+        while (extras.length > extrasNeeded) {
+            extras.pop()?.remove();
+        }
+
+        extraContainer.classList.toggle('hidden', extrasNeeded === 0);
+        extraContainer.toggleAttribute('hidden', extrasNeeded === 0);
+    }
+
+    return [...primary, ...extras.slice(0, extrasNeeded)];
+}
+
+function renderIncenseShrines(sticks) {
+    const holderCount = incenseHolderCount(sticks);
+    const distribution = distributeIncenseSticks(sticks, holderCount);
+    const holders = ensureIncenseHolderElements(holderCount);
+
+    holders.forEach((shrine, index) => {
+        const count = distribution[index] ?? 0;
+        shrine.dataset.incenseSticks = String(count);
+
+        if (count > 0) {
+            shrine.innerHTML = incenseSvg({ lit: true, sticks: count });
+            shrine.classList.remove('hidden');
+            shrine.removeAttribute('hidden');
+            return;
+        }
+
+        shrine.innerHTML = incenseSvg({ lit: false, sticks: 0 });
+        shrine.classList.toggle('hidden', index >= 2);
+        shrine.toggleAttribute('hidden', index >= 2);
     });
-    startSyllableSmoke(expiresAt);
+}
+
+function updateIncenseDisplay(incense) {
+    const sticks = incenseStickCount(incense);
+    currentIncenseSticks = sticks;
+    renderIncenseShrines(sticks);
+    ensureSyllableSmoke(sticks);
 }
 
 function getCloudTargetNow() {
@@ -156,11 +251,18 @@ function getCloudTargetNow() {
     }
 
     const elapsed = Date.now() - syllableSmokeStartedAt;
-    return Math.min(CLOUD_TARGET, Math.floor((elapsed / CLOUD_FILL_MS) * CLOUD_TARGET));
+    const target = getCloudTargetMax();
+    return Math.min(target, Math.floor((elapsed / getCloudFillMs()) * target));
+}
+
+function getIncenseShrines() {
+    return [...document.querySelectorAll(INCENSE_SHRINE_SELECTOR)].filter(
+        (shrine) => Number.parseInt(shrine.dataset.incenseSticks ?? '0', 10) > 0,
+    );
 }
 
 function getCloudSpawnX() {
-    const sources = getIncenseShrines().filter((shrine) => !shrine.classList.contains('hidden'));
+    const sources = getIncenseShrines();
     let baseX = window.innerWidth / 2;
 
     if (sources.length) {
@@ -175,7 +277,7 @@ function getCloudSpawnX() {
 
 function spawnCloudSyllable(position = null) {
     const container = document.getElementById(SYLLABLE_SMOKE_ID);
-    const sources = getIncenseShrines().filter((shrine) => !shrine.classList.contains('hidden'));
+    const sources = getIncenseShrines();
     if (!container || !sources.length) {
         return;
     }
@@ -220,7 +322,7 @@ function depositCloudFromRiser(particle) {
 
 function spawnRisingSyllable() {
     const container = document.getElementById(SYLLABLE_SMOKE_ID);
-    const sources = getIncenseShrines().filter((shrine) => !shrine.classList.contains('hidden'));
+    const sources = getIncenseShrines();
     if (!container || !sources.length) {
         return;
     }
@@ -251,7 +353,7 @@ function spawnRisingSyllable() {
 
 function maintainSyllableCloud() {
     const container = document.getElementById(SYLLABLE_SMOKE_ID);
-    const sources = getIncenseShrines().filter((shrine) => !shrine.classList.contains('hidden'));
+    const sources = getIncenseShrines();
     if (!container || !sources.length) {
         return;
     }
@@ -267,26 +369,7 @@ function maintainSyllableCloud() {
     spawnCloudSyllable();
 }
 
-function startSyllableSmoke(expiresAt) {
-    stopSyllableSmoke();
-
-    const expiresMs = new Date(expiresAt).getTime();
-    const remaining = expiresMs - Date.now();
-
-    if (remaining <= 0) {
-        return;
-    }
-
-    syllableSmokeStartedAt = Math.max(Date.now() - (INCENSE_BURN_MS - remaining), Date.now() - INCENSE_BURN_MS);
-
-    syllableCloudInterval = window.setInterval(maintainSyllableCloud, 900);
-    syllableRiseInterval = window.setInterval(spawnRisingSyllable, 240);
-    syllableTimeout = window.setTimeout(stopSyllableSmoke, remaining);
-
-    spawnRisingSyllable();
-}
-
-function stopSyllableSmoke() {
+function clearSyllableIntervals() {
     if (syllableCloudInterval) {
         clearInterval(syllableCloudInterval);
         syllableCloudInterval = null;
@@ -296,21 +379,76 @@ function stopSyllableSmoke() {
         clearInterval(syllableRiseInterval);
         syllableRiseInterval = null;
     }
+}
 
-    if (syllableTimeout) {
-        clearTimeout(syllableTimeout);
-        syllableTimeout = null;
+function startSyllableIntervals() {
+    clearSyllableIntervals();
+    syllableCloudInterval = window.setInterval(maintainSyllableCloud, getCloudMaintainMs());
+    syllableRiseInterval = window.setInterval(spawnRisingSyllable, getRiseIntervalMs());
+    spawnRisingSyllable();
+}
+
+function ensureSyllableSmoke(sticks) {
+    currentIncenseSticks = sticks;
+
+    if (!syllableSmokeRunning) {
+        syllableSmokeStartedAt = Date.now();
+        syllableSmokeRunning = true;
     }
 
-    syllableSmokeStartedAt = 0;
+    startSyllableIntervals();
+}
 
-    const container = document.getElementById(SYLLABLE_SMOKE_ID);
-    container?.querySelectorAll('.syllable-particle').forEach((particle) => {
-        particle.style.animation = 'none';
-        particle.style.transition = 'opacity 1.8s ease';
-        particle.style.opacity = '0';
-        window.setTimeout(() => particle.remove(), 1800);
-    });
+function updateLivePractitioners(count) {
+    const el = document.getElementById(LIVE_PRACTITIONERS_COUNT_ID);
+    if (el && typeof count === 'number') {
+        el.textContent = formatCount(count);
+    }
+}
+
+function getPractitionerToken() {
+    let token = sessionStorage.getItem(PRACTITIONER_TOKEN_KEY);
+    if (!token) {
+        token = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem(PRACTITIONER_TOKEN_KEY, token);
+    }
+
+    return token;
+}
+
+async function sendPractitionerHeartbeat() {
+    try {
+        const response = await fetch('/practitioner-presence', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({ token: getPractitionerToken() }),
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        if (typeof data.live_practitioners === 'number') {
+            updateLivePractitioners(data.live_practitioners);
+        }
+    } catch {
+        // ignore heartbeat errors
+    }
+}
+
+function startPractitionerPresence() {
+    sendPractitionerHeartbeat();
+
+    if (practitionerHeartbeatInterval) {
+        return;
+    }
+
+    practitionerHeartbeatInterval = window.setInterval(sendPractitionerHeartbeat, 120000);
 }
 
 function offeringRowLandingPoint(container) {
@@ -500,14 +638,10 @@ function initOfferingGraphics() {
         lampSvg({ lit: true, flameId: MODAL_OFFERING_FLAME_ID }),
     );
 
-    document.querySelectorAll('.incense-shrine').forEach((shrine) => {
-        shrine.innerHTML = incenseSvg({ lit: !shrine.classList.contains('hidden') });
-    });
-
     document.querySelector('.incense-preview')?.replaceChildren();
     document.querySelector('.incense-preview')?.insertAdjacentHTML(
         'beforeend',
-        incenseSvg({ lit: false }),
+        incenseSvg({ lit: true, sticks: 1 }),
     );
 
     document.querySelectorAll('.water-bowl-stacked').forEach((bowl) => {
@@ -1233,6 +1367,8 @@ document.getElementById(MANTRA_COUNT_ID)?.addEventListener('keydown', (event) =>
 
 loadInitialState();
 initOfferingGraphics();
+updateIncenseDisplay(shrineState.incense);
+startPractitionerPresence();
 initFirstVisitPrompts();
 
 if (waterToken) {

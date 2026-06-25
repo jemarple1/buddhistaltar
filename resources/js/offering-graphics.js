@@ -323,21 +323,44 @@ export function lampSvg({ lit = false, flameId = null } = {}) {
   </svg>`;
 }
 
-export function incenseSvg({ lit = true } = {}) {
+export function incenseSvg({ lit = true, sticks = 1 } = {}) {
     const ids = nextSvgIds();
-    const tip = lit
-        ? `<circle cx="32" cy="9" r="2.8" fill="#ff5500" filter="url(#${ids.glow})"><animate attributeName="opacity" values="0.82;1;0.82" dur="1.6s" repeatCount="indefinite"/></circle>
-           <circle cx="32" cy="9" r="6.5" fill="#ff8800" opacity="0.32"/>
-           <circle cx="31" cy="8" r="1" fill="#fff5cc" opacity="0.9"/>`
-        : `<circle cx="32" cy="9" r="2.2" fill="#666" opacity="0.35"/>`;
-    return `<svg class="offering-svg offering-svg--incense" viewBox="0 0 64 80" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids)}
+
+    if (sticks <= 0) {
+        return `<svg class="offering-svg offering-svg--incense" viewBox="0 0 64 80" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids)}
     <ellipse cx="32" cy="75" rx="21" ry="4" fill="#000" opacity="0.18"/>
     <path d="M13 59 C11 73 15 77 32 77 C49 77 53 73 51 59 Z" fill="#78716c" stroke="#44403c" stroke-width="0.65"/>
     <ellipse cx="32" cy="61" rx="17" ry="3.2" fill="#a8a29e"/>
     <ellipse cx="32" cy="59" rx="19" ry="2.2" fill="#d6d3d1"/>
-    <path d="M32 57 L32 13" stroke="#92400e" stroke-width="2.4" stroke-linecap="round"/>
-    <path d="M32 30 Q33 20 32 13" stroke="#b45309" stroke-width="0.6" opacity="0.45" fill="none"/>
-    ${tip}
+  </svg>`;
+    }
+
+    const count = Math.max(1, Math.min(sticks, 3));
+    const width = 64 + Math.max(0, count - 1) * 10;
+    const center = width / 2;
+    const startX = center - ((count - 1) * 5) / 2;
+
+    let stickMarkup = '';
+    for (let i = 0; i < count; i++) {
+        const x = startX + i * 5;
+        const tipY = 11 + (i % 3);
+        stickMarkup += `<path d="M${x} 57 L${x} ${tipY + 2}" stroke="#92400e" stroke-width="2.1" stroke-linecap="round"/>`;
+        stickMarkup += `<path d="M${x} 30 Q${x + 0.6} ${tipY + 10} ${x} ${tipY + 2}" stroke="#b45309" stroke-width="0.55" opacity="0.45" fill="none"/>`;
+        if (lit) {
+            stickMarkup += `<circle cx="${x}" cy="${tipY}" r="2.4" fill="#ff5500" filter="url(#${ids.glow})"><animate attributeName="opacity" values="0.82;1;0.82" dur="${1.4 + (i % 3) * 0.2}s" repeatCount="indefinite"/></circle>`;
+            stickMarkup += `<circle cx="${x}" cy="${tipY}" r="5.5" fill="#ff8800" opacity="0.28"/>`;
+            stickMarkup += `<circle cx="${x - 0.6}" cy="${tipY - 0.8}" r="0.85" fill="#fff5cc" opacity="0.9"/>`;
+        } else {
+            stickMarkup += `<circle cx="${x}" cy="${tipY}" r="2" fill="#666" opacity="0.35"/>`;
+        }
+    }
+
+    return `<svg class="offering-svg offering-svg--incense" viewBox="0 0 ${width} 80" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids)}
+    <ellipse cx="${center}" cy="75" rx="${21 + Math.max(0, count - 3) * 2}" ry="4" fill="#000" opacity="0.18"/>
+    <path d="M${center - 19} 59 C${center - 21} 73 ${center - 17} 77 ${center} 77 C${center + 17} 77 ${center + 21} 73 ${center + 19} 59 Z" fill="#78716c" stroke="#44403c" stroke-width="0.65"/>
+    <ellipse cx="${center}" cy="61" rx="${17 + Math.max(0, count - 3) * 2}" ry="3.2" fill="#a8a29e"/>
+    <ellipse cx="${center}" cy="59" rx="${19 + Math.max(0, count - 3) * 2}" ry="2.2" fill="#d6d3d1"/>
+    ${stickMarkup}
   </svg>`;
 }
 
