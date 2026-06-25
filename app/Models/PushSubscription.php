@@ -11,6 +11,7 @@ class PushSubscription extends Model
         'visitor_token',
         'shrine',
         'endpoint',
+        'endpoint_hash',
         'public_key',
         'auth_token',
     ];

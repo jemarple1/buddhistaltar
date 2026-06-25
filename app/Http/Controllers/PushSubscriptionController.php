@@ -26,13 +26,16 @@ class PushSubscriptionController extends Controller
             'subscription.keys.auth' => ['required', 'string'],
         ]);
 
+        $endpoint = $validated['subscription']['endpoint'];
+
         PushSubscription::query()->updateOrCreate(
             [
                 'visitor_token' => $validated['visitor_token'],
-                'endpoint' => $validated['subscription']['endpoint'],
+                'endpoint_hash' => hash('sha256', $endpoint),
             ],
             [
                 'shrine' => $slug,
+                'endpoint' => $endpoint,
                 'public_key' => $validated['subscription']['keys']['p256dh'],
                 'auth_token' => $validated['subscription']['keys']['auth'],
             ],
