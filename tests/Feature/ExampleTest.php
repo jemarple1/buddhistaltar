@@ -21,7 +21,8 @@ class ExampleTest extends TestCase
         $response = $this->get('/');
 
         $response->assertStatus(200);
-        $response->assertSee('Avalokiteshvara');
+        $response->assertSee('Namo Avalokiteshvaraya!');
+        $response->assertSee('Homage to The One Who Looks Upon Beings with Compassion!');
         $response->assertSee('Offerings');
         $response->assertSee('Incense');
         $response->assertSee('Water Bowls');
@@ -37,6 +38,7 @@ class ExampleTest extends TestCase
         $response->assertSee('The Dhāraṇī of Noble Avalokiteśvara');
         $response->assertSee('Mantra Repetitions');
         $response->assertSee('Live practitioners');
+        $response->assertSee('Offer music');
     }
 
     public function test_a_butter_lamp_can_be_offered(): void
@@ -83,6 +85,38 @@ class ExampleTest extends TestCase
         ]);
         $response->assertOk();
         $response->assertJsonPath('live_practitioners', 2);
+    }
+
+    public function test_music_offering_plays_beside_the_shrine(): void
+    {
+        $trackId = (int) \Illuminate\Support\Facades\DB::table('music_tracks')->value('id');
+
+        $response = $this->postJson('/music-offerings', [
+            'track_id' => $trackId,
+            'name' => 'Mila',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('offering.name', 'Mila');
+        $response->assertJsonPath('offering.side', 'left');
+        $response->assertJsonPath('offering.track.youtube_id', 'QZ94XtY_fJM');
+        $response->assertJsonPath('offering.track.title', 'Snow Lion by Tenzin Chogyal');
+        $response->assertJsonPath('offering.track.youtube_start_seconds', 814);
+        $response->assertJsonPath('shrine_state.music.active.0.name', 'Mila');
+    }
+
+    public function test_music_suggestion_is_stored(): void
+    {
+        $response = $this->postJson('/music-suggestions', [
+            'url' => 'https://www.youtube.com/watch?v=abc123xyz12',
+            'name' => 'Sam',
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('music_suggestions', [
+            'youtube_url' => 'https://www.youtube.com/watch?v=abc123xyz12',
+            'suggested_by_name' => 'Sam',
+        ]);
     }
 
     public function test_water_offering_locks_for_one_person_at_a_time(): void

@@ -6,6 +6,9 @@ use App\Models\ButterLamp;
 use App\Models\FlowerOffering;
 use App\Models\IncenseOffering;
 use App\Models\MantraRepetition;
+use App\Models\MusicOffering;
+use App\Models\MusicSuggestion;
+use App\Models\MusicTrack;
 use App\Models\PractitionerPresence;
 use App\Models\WaterBowlSession;
 use Illuminate\Http\JsonResponse;
@@ -17,7 +20,7 @@ use Illuminate\View\View;
 class ShrineController extends Controller
 {
     /** @var list<string> */
-    private const FLOWER_TYPES = ['lotus', 'marigold', 'peony', 'orchid', 'rose', 'chrysanthemum'];
+    private const FLOWER_TYPES = ['lotus', 'tulip', 'sunflower', 'marigold', 'peony', 'rose'];
 
     /** @var list<string> */
     private const VASE_COLORS = ['blue', 'white', 'yellow', 'red', 'green'];
@@ -181,6 +184,60 @@ class ShrineController extends Controller
         ], 201);
     }
 
+    public function storeMusic(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'track_id' => ['required', 'integer', 'exists:music_tracks,id'],
+            'name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $track = MusicTrack::query()
+            ->where('active', true)
+            ->findOrFail($validated['track_id']);
+
+        $name = isset($validated['name']) ? trim($validated['name']) : null;
+        if ($name === '') {
+            $name = null;
+        }
+
+        $side = $this->nextMusicSide();
+
+        $offering = MusicOffering::create([
+            'music_track_id' => $track->id,
+            'name' => $name,
+            'expires_at' => now()->addMinutes(15),
+        ]);
+
+        $offering->load('track');
+
+        return response()->json([
+            'offering' => $this->formatMusicOffering($offering, $side),
+            'shrine_state' => $this->buildShrineState(),
+        ], 201);
+    }
+
+    public function storeMusicSuggestion(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'url' => ['required', 'string', 'max:500', 'regex:/(?:youtube\.com|youtu\.be)/i'],
+            'name' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $name = isset($validated['name']) ? trim($validated['name']) : null;
+        if ($name === '') {
+            $name = null;
+        }
+
+        MusicSuggestion::create([
+            'youtube_url' => trim($validated['url']),
+            'suggested_by_name' => $name,
+        ]);
+
+        return response()->json([
+            'message' => 'Thank you — your suggestion has been recorded.',
+        ], 201);
+    }
+
     public function acquireWaterLock(Request $request): JsonResponse
     {
         $this->expireStaleWaterSessions();
@@ -294,6 +351,12 @@ class ShrineController extends Controller
                     ->where('name', '!=', '')
                     ->get(['name', 'created_at']),
             )
+            ->merge(
+                MusicOffering::query()
+                    ->whereNotNull('name')
+                    ->where('name', '!=', '')
+                    ->get(['name', 'created_at']),
+            )
             ->sortBy('created_at')
             ->pluck('name')
             ->values();
@@ -351,6 +414,7 @@ class ShrineController extends Controller
         return [
             'incense' => $this->formatIncenseState(),
             'flowers' => $flowers,
+            'music' => $this->formatMusicState(),
             'offering_names' => $this->offeringNames(),
             'live_practitioners' => $this->livePractitionerCount(),
             'water' => [
@@ -417,5 +481,77 @@ class ShrineController extends Controller
         PractitionerPresence::query()
             ->where('last_seen_at', '<', now()->subMinutes(30))
             ->delete();
+    }
+
+    /**
+     * @return array{tracks: list<array<string, mixed>>, active: list<array<string, mixed>>}
+     */
+    private function formatMusicState(): array
+    {
+        $tracks = MusicTrack::query()
+            ->where('active', true)
+            ->orderBy('title')
+            ->get(['id', 'youtube_id', 'youtube_start_seconds', 'title', 'thumbnail_url'])
+            ->map(fn (MusicTrack $track) => [
+                'id' => $track->id,
+                'youtube_id' => $track->youtube_id,
+                'youtube_start_seconds' => $track->youtube_start_seconds,
+                'title' => $track->title,
+                'thumbnail_url' => $track->thumbnail_url
+                    ?? "https://img.youtube.com/vi/{$track->youtube_id}/mqdefault.jpg",
+            ])
+            ->values()
+            ->all();
+
+        $activeOfferings = MusicOffering::query()
+            ->with('track:id,youtube_id,youtube_start_seconds,title,thumbnail_url')
+            ->where('expires_at', '>', now())
+            ->orderBy('created_at')
+            ->get();
+
+        $active = $activeOfferings
+            ->values()
+            ->map(fn (MusicOffering $offering, int $index) => $this->formatMusicOffering(
+                $offering,
+                $index % 2 === 0 ? 'left' : 'right',
+            ))
+            ->all();
+
+        return [
+            'tracks' => $tracks,
+            'active' => $active,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatMusicOffering(MusicOffering $offering, string $side): array
+    {
+        $track = $offering->track;
+
+        return [
+            'id' => $offering->id,
+            'name' => $offering->name,
+            'side' => $side,
+            'expires_at' => $offering->expires_at->toIso8601String(),
+            'track' => [
+                'id' => $track->id,
+                'youtube_id' => $track->youtube_id,
+                'youtube_start_seconds' => $track->youtube_start_seconds,
+                'title' => $track->title,
+                'thumbnail_url' => $track->thumbnail_url
+                    ?? "https://img.youtube.com/vi/{$track->youtube_id}/mqdefault.jpg",
+            ],
+        ];
+    }
+
+    private function nextMusicSide(): string
+    {
+        $activeCount = MusicOffering::query()
+            ->where('expires_at', '>', now())
+            ->count();
+
+        return $activeCount % 2 === 0 ? 'left' : 'right';
     }
 }

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Offer a butter lamp and recite the dhāraṇī of Noble Avalokiteśvara.">
-    <title>Avalokiteshvara Shrine — Butter Lamp Offerings</title>
+    <title>Namo Avalokiteshvaraya — Shrine Offerings</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/shrine.js'])
 </head>
@@ -21,7 +21,7 @@
             <div class="deity-hero w-full">
                 <img
                     src="{{ asset('images/avalokiteshvara.webp') }}?v={{ filemtime(public_path('images/avalokiteshvara.webp')) }}"
-                    alt="Avalokiteshvara, the bodhisattva of compassion"
+                    alt="Avalokiteshvara, homage to the one who looks upon beings with compassion"
                     width="1024"
                     height="1024"
                     class="avalokiteshvara-image"
@@ -34,8 +34,8 @@
                 <div class="incense-shrine" aria-label="Burning incense offering on the left"></div>
 
                 <div class="deity-title">
-                    <h1 class="text-xl font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">Avalokiteshvara</h1>
-                    <p class="mt-1 text-sm italic text-white/85 drop-shadow-sm">Lord of Great Compassion</p>
+                    <h1 class="text-xl font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">Namo Avalokiteshvaraya!</h1>
+                    <p class="mt-1 text-sm italic text-white/85 drop-shadow-sm">Homage to The One Who Looks Upon Beings with Compassion!</p>
                 </div>
 
                 <div class="incense-shrine" aria-label="Burning incense offering on the right"></div>
@@ -72,6 +72,8 @@
                     </div>
                 @endforeach
             </div>
+
+            <div id="offered-music" class="offering-row offering-row--music mt-3 px-4" aria-label="Music offerings"></div>
         </header>
 
         <footer class="offering-panel relative z-10 px-4 py-8">
@@ -113,7 +115,7 @@
                         {{-- Flowers --}}
                         <div class="offering-column" id="flower-column">
                             <h3 class="offering-column-title">Flowers</h3>
-                            <p class="offering-column-desc">Offer a vase of flowers</p>
+                            <p class="offering-column-desc">Offer a bouquet in a decorated vase</p>
                             <div class="offering-preview">
                                 <div id="flower-preview" class="flower-vase scale-110"></div>
                             </div>
@@ -129,6 +131,18 @@
                                 <div id="offering-lamp" class="butter-lamp scale-125"></div>
                             </div>
                             <button type="button" id="btn-light" class="btn-shrine mt-4 w-full rounded px-4 py-2.5 text-sm tracking-wide">Light</button>
+                        </div>
+                    </div>
+
+                    <div class="offerings-row offerings-row--music mt-4">
+                        <div class="offering-column offering-column--music">
+                            <h3 class="offering-column-title">Music</h3>
+                            <p class="offering-column-desc">Offer sacred music before the shrine</p>
+                            <div class="offering-preview music-preview">
+                                <div id="music-preview" class="music-preview-dranyen"></div>
+                            </div>
+                            <input type="text" id="music-name" maxlength="100" placeholder="Name (optional)" class="name-input mt-4 w-full rounded px-3 py-2 text-sm italic">
+                            <button type="button" id="btn-offer-music" class="btn-shrine mt-3 w-full rounded px-4 py-2.5 text-sm tracking-wide">Offer music</button>
                         </div>
                     </div>
                 </section>
@@ -242,6 +256,29 @@
             <div class="shrine-modal-body">
                 @include('partials.merit-dedication', ['offeringNames' => $offeringNames])
                 <button type="button" id="btn-dismiss-dedication" class="btn-shrine mt-6 w-full rounded px-4 py-2.5 text-sm tracking-wide" data-close-dedication>Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="music-offering-modal" class="shrine-modal" hidden aria-hidden="true">
+        <div class="shrine-modal-backdrop" data-close-music aria-hidden="true"></div>
+        <div class="shrine-modal-dialog music-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="music-modal-title">
+            <div class="shrine-modal-header">
+                <h2 id="music-modal-title" class="text-sm font-medium tracking-wide text-sky-950">Choose Music Offering</h2>
+                <button type="button" id="btn-close-music-modal" class="shrine-modal-close" aria-label="Close music selection">&times;</button>
+            </div>
+            <div class="shrine-modal-body">
+                <p class="text-sm text-sky-950/70">Select a piece to offer before the shrine. It will join the music row for fifteen minutes.</p>
+                <div id="music-catalog" class="music-catalog-grid mt-4" role="list"></div>
+
+                <div class="music-suggest-panel mt-6 border-t border-sky-900/10 pt-5">
+                    <h3 class="text-xs tracking-[0.18em] uppercase text-sky-950/60">Suggest a YouTube link</h3>
+                    <p class="mt-1 text-xs text-sky-950/55">Share a piece you would like added to the shrine catalog.</p>
+                    <label for="music-suggest-url" class="sr-only">YouTube link</label>
+                    <input type="url" id="music-suggest-url" maxlength="500" placeholder="https://www.youtube.com/watch?v=..." class="name-input mt-3 w-full rounded px-3 py-2 text-sm">
+                    <button type="button" id="btn-submit-music-suggestion" class="btn-shrine mt-3 w-full rounded px-4 py-2.5 text-sm tracking-wide">Submit suggestion</button>
+                    <p id="music-suggest-status" class="mt-2 hidden text-xs text-sky-950/70" role="status"></p>
+                </div>
             </div>
         </div>
     </div>

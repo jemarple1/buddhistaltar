@@ -6,12 +6,14 @@ import {
     flowerSvg,
     lampSvg,
     incenseSvg,
+    dranyenSvg,
     waterBowlSvg,
     waterPitcherSvg,
 } from './offering-graphics.js';
 
 const OFFERING_FLAME_ID = 'offering-flame';
 const OFFERED_LAMPS_ID = 'offered-lamps';
+const OFFERED_MUSIC_ID = 'offered-music';
 const OFFERED_FLOWERS_ID = 'offered-flowers';
 const LAMP_NAME_ID = 'lamp-name';
 const BTN_LIGHT_ID = 'btn-light';
@@ -30,6 +32,14 @@ const BTN_CLOSE_LAMP_MODAL_ID = 'btn-close-lamp-modal';
 const BTN_OFFER_INCENSE_ID = 'btn-offer-incense';
 const BTN_OFFER_FLOWER_ID = 'btn-offer-flower';
 const BTN_BEGIN_WATER_ID = 'btn-begin-water';
+const BTN_OFFER_MUSIC_ID = 'btn-offer-music';
+const BTN_CLOSE_MUSIC_MODAL_ID = 'btn-close-music-modal';
+const BTN_SUBMIT_MUSIC_SUGGESTION_ID = 'btn-submit-music-suggestion';
+const MUSIC_MODAL_ID = 'music-offering-modal';
+const MUSIC_CATALOG_ID = 'music-catalog';
+const MUSIC_NAME_ID = 'music-name';
+const MUSIC_SUGGEST_URL_ID = 'music-suggest-url';
+const MUSIC_SUGGEST_STATUS_ID = 'music-suggest-status';
 const INCENSE_SHRINE_SELECTOR = '.deity-title-row .incense-shrine, #incense-shrine-extra .incense-shrine';
 const INCENSE_SHRINE_EXTRA_ID = 'incense-shrine-extra';
 const MAX_STICKS_PER_HOLDER = 3;
@@ -88,6 +98,7 @@ const CLOUD_MAINTAIN_MIN = 450;
 let syllableSmokeStartedAt = 0;
 let currentIncenseSticks = 1;
 let syllableSmokeRunning = false;
+let isSelectingMusic = false;
 
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -136,9 +147,303 @@ function renderDedication(names) {
 function applyShrineState() {
     updateIncenseDisplay(shrineState.incense);
     renderFlowers(shrineState.flowers ?? []);
+    renderMusicOfferings(shrineState.music);
     applyWaterState(shrineState.water ?? {});
     populateMeritNamesCarousel(shrineState.offering_names ?? []);
     updateLivePractitioners(shrineState.live_practitioners ?? 0);
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function youtubeEmbedUrl(youtubeId, { mute = true, autoplay = true, start = 0 } = {}) {
+    const params = new URLSearchParams({
+        autoplay: autoplay ? '1' : '0',
+        mute: mute ? '1' : '0',
+        controls: '0',
+        modestbranding: '1',
+        rel: '0',
+        playsinline: '1',
+        loop: '1',
+        playlist: youtubeId,
+        enablejsapi: '1',
+    });
+
+    if (start > 0) {
+        params.set('start', String(Math.floor(start)));
+    }
+
+    return `https://www.youtube.com/embed/${youtubeId}?${params.toString()}`;
+}
+
+function musicLandingPoint() {
+    const container = document.getElementById(OFFERED_MUSIC_ID);
+    if (!container) {
+        return null;
+    }
+
+    const lastPlayer = container.querySelector('.music-player:last-of-type');
+    if (lastPlayer) {
+        const rect = lastPlayer.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width + Math.min(rect.width * 0.35, 48),
+            y: rect.top + rect.height / 2,
+        };
+    }
+
+    return offeringRowLandingPoint(container);
+}
+
+function unmuteMusicPlayer(playerEl, youtubeId, start = 0) {
+    const iframe = playerEl.querySelector('iframe');
+    const btn = playerEl.querySelector('.music-unmute-btn');
+    if (!iframe) {
+        return;
+    }
+
+    iframe.src = youtubeEmbedUrl(youtubeId, { mute: false, autoplay: true, start });
+    btn?.classList.add('is-unmuted');
+}
+
+function createMusicPlayerElement(offering) {
+    const player = document.createElement('div');
+    player.className = 'music-player';
+    player.dataset.offeringId = String(offering.id);
+    const track = offering.track;
+    const start = track.youtube_start_seconds ?? 0;
+    const embedUrl = youtubeEmbedUrl(track.youtube_id, { mute: true, autoplay: true, start });
+
+    player.innerHTML = `
+        <div class="music-player-frame">
+            <iframe
+                src="${embedUrl}"
+                title="${escapeHtml(track.title)}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allowfullscreen
+            ></iframe>
+        </div>
+        <button type="button" class="music-unmute-btn">Unmute</button>
+        ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
+    `;
+
+    player.querySelector('.music-unmute-btn')?.addEventListener('click', () => {
+        unmuteMusicPlayer(player, track.youtube_id, start);
+    });
+
+    return player;
+}
+
+function renderMusicOfferings(musicState) {
+    const container = document.getElementById(OFFERED_MUSIC_ID);
+    if (!container) {
+        return;
+    }
+
+    container.replaceChildren();
+
+    (musicState?.active ?? []).forEach((offering) => {
+        container.appendChild(createMusicPlayerElement(offering));
+    });
+}
+
+function renderMusicCatalog(tracks) {
+    const catalog = document.getElementById(MUSIC_CATALOG_ID);
+    if (!catalog) {
+        return;
+    }
+
+    catalog.replaceChildren();
+
+    (tracks ?? []).forEach((track) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'music-track-card';
+        card.setAttribute('role', 'listitem');
+        card.dataset.trackId = String(track.id);
+        card.innerHTML = `
+            <img class="music-track-card-thumb" src="${escapeHtml(track.thumbnail_url)}" alt="">
+            <span class="music-track-card-body">
+                <span class="music-track-card-title">${escapeHtml(track.title)}</span>
+            </span>
+        `;
+        card.addEventListener('click', () => selectMusicTrack(track, card));
+        catalog.appendChild(card);
+    });
+}
+
+function openMusicModal() {
+    const modal = document.getElementById(MUSIC_MODAL_ID);
+    if (!modal) {
+        return;
+    }
+
+    renderMusicCatalog(shrineState.music?.tracks ?? []);
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('overflow-hidden');
+    document.getElementById(BTN_CLOSE_MUSIC_MODAL_ID)?.focus();
+}
+
+function closeMusicModal(force = false) {
+    if (isSelectingMusic && !force) {
+        return;
+    }
+
+    const modal = document.getElementById(MUSIC_MODAL_ID);
+    if (!modal) {
+        return;
+    }
+
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('overflow-hidden');
+    document.getElementById(BTN_OFFER_MUSIC_ID)?.focus();
+}
+
+async function animateMusicToAltar(sourceRect, track) {
+    const landing = musicLandingPoint();
+    if (!landing) {
+        return;
+    }
+
+    const flying = document.createElement('div');
+    flying.className = 'flying-music';
+    flying.innerHTML = `<img src="${escapeHtml(track.thumbnail_url)}" alt="">`;
+    flying.style.left = `${sourceRect.left + sourceRect.width / 2}px`;
+    flying.style.top = `${sourceRect.top}px`;
+    flying.style.transform = 'translate(-50%, 0)';
+    document.body.appendChild(flying);
+
+    await new Promise((resolve) => {
+        const startX = sourceRect.left + sourceRect.width / 2;
+        const startY = sourceRect.top;
+        const endX = landing.x;
+        const endY = landing.y;
+        const duration = 1700;
+        const startTime = performance.now();
+
+        const animate = (now) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = 1 - (1 - progress) ** 3;
+            flying.style.left = `${startX + (endX - startX) * eased}px`;
+            flying.style.top = `${startY + (endY - startY) * eased - Math.sin(progress * Math.PI) * 70}px`;
+            flying.style.opacity = `${0.65 + progress * 0.35}`;
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                flying.remove();
+                resolve();
+            }
+        };
+
+        requestAnimationFrame(animate);
+    });
+}
+
+async function selectMusicTrack(track, cardEl) {
+    if (isSelectingMusic) {
+        return;
+    }
+
+    isSelectingMusic = true;
+    document.querySelectorAll('.music-track-card').forEach((card) => {
+        card.disabled = true;
+    });
+
+    const nameInput = document.getElementById(MUSIC_NAME_ID);
+    const name = nameInput?.value.trim() || null;
+    const sourceRect = cardEl.getBoundingClientRect();
+
+    closeMusicModal(true);
+
+    try {
+        await animateMusicToAltar(sourceRect, track);
+
+        const response = await fetch('/music-offerings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({ track_id: track.id, name }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Music offering failed');
+        }
+
+        const data = await response.json();
+        shrineState = data.shrine_state ?? shrineState;
+        renderMusicOfferings(shrineState.music);
+        populateMeritNamesCarousel(shrineState.offering_names ?? []);
+
+        if (nameInput) {
+            nameInput.value = '';
+        }
+    } catch {
+        alert('Unable to offer this music. Please try again.');
+    } finally {
+        isSelectingMusic = false;
+        document.querySelectorAll('.music-track-card').forEach((card) => {
+            card.disabled = false;
+        });
+    }
+}
+
+async function submitMusicSuggestion() {
+    const urlInput = document.getElementById(MUSIC_SUGGEST_URL_ID);
+    const statusEl = document.getElementById(MUSIC_SUGGEST_STATUS_ID);
+    const nameInput = document.getElementById(MUSIC_NAME_ID);
+    const btn = document.getElementById(BTN_SUBMIT_MUSIC_SUGGESTION_ID);
+    const url = urlInput?.value.trim() ?? '';
+
+    if (!url) {
+        return;
+    }
+
+    btn?.setAttribute('disabled', 'disabled');
+
+    try {
+        const response = await fetch('/music-suggestions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                url,
+                name: nameInput?.value.trim() || null,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message ?? 'Suggestion failed');
+        }
+
+        if (urlInput) {
+            urlInput.value = '';
+        }
+
+        if (statusEl) {
+            statusEl.textContent = data.message ?? 'Thank you — your suggestion has been recorded.';
+            statusEl.classList.remove('hidden');
+        }
+    } catch {
+        alert('Unable to submit your suggestion. Please check the link and try again.');
+    } finally {
+        btn?.removeAttribute('disabled');
+    }
 }
 
 function incenseStickCount(incense) {
@@ -643,6 +948,11 @@ function initOfferingGraphics() {
         'beforeend',
         incenseSvg({ lit: true, sticks: 1 }),
     );
+
+    const musicPreview = document.getElementById('music-preview');
+    if (musicPreview) {
+        musicPreview.innerHTML = dranyenSvg();
+    }
 
     document.querySelectorAll('.water-bowl-stacked').forEach((bowl) => {
         bowl.innerHTML = waterBowlSvg({ filled: false });
@@ -1297,6 +1607,12 @@ document.getElementById(BTN_CLOSE_SUTRA_ID)?.addEventListener('click', closeSutr
 document.getElementById(BTN_OFFER_INCENSE_ID)?.addEventListener('click', offerIncense);
 document.getElementById(BTN_OFFER_FLOWER_ID)?.addEventListener('click', offerFlower);
 document.getElementById(BTN_BEGIN_WATER_ID)?.addEventListener('click', beginWaterOffering);
+document.getElementById(BTN_OFFER_MUSIC_ID)?.addEventListener('click', openMusicModal);
+document.getElementById(BTN_CLOSE_MUSIC_MODAL_ID)?.addEventListener('click', closeMusicModal);
+document.getElementById(BTN_SUBMIT_MUSIC_SUGGESTION_ID)?.addEventListener('click', submitMusicSuggestion);
+document.querySelectorAll('[data-close-music]').forEach((element) => {
+    element.addEventListener('click', closeMusicModal);
+});
 
 document.querySelectorAll('[data-close-sutra]').forEach((element) => {
     element.addEventListener('click', closeSutraModal);
@@ -1326,8 +1642,14 @@ document.addEventListener('keydown', (event) => {
     const lampModal = document.getElementById(LAMP_OFFERING_MODAL_ID);
     const refugeModal = document.getElementById(REFUGE_MODAL_ID);
     const dedicationModal = document.getElementById(DEDICATION_MODAL_ID);
+    const musicModal = document.getElementById(MUSIC_MODAL_ID);
 
     if (event.key === 'Escape') {
+        if (musicModal && !musicModal.hidden) {
+            closeMusicModal();
+            return;
+        }
+
         if (lampModal && !lampModal.hidden) {
             closeLampOfferingModal();
             return;

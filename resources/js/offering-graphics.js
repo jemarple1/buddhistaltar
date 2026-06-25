@@ -1,4 +1,4 @@
-export const FLOWER_TYPES = ['lotus', 'marigold', 'peony', 'orchid', 'rose', 'chrysanthemum'];
+export const FLOWER_TYPES = ['lotus', 'tulip', 'sunflower', 'marigold', 'peony', 'rose'];
 
 export const VASE_COLORS = ['blue', 'white', 'yellow', 'red', 'green'];
 
@@ -223,84 +223,142 @@ function svgDefs(ids, vaseColor = null) {
 
 const VASE_PATH = 'M24 73 C22 86 26 96 40 97 C54 96 58 86 56 73 Z';
 
-function vaseMarkup(ids, color = 'blue') {
+function vaseBodyMarkup(ids, color = 'blue') {
     const palette = VASE_PALETTES[color] ?? VASE_PALETTES.blue;
 
     return `
     <ellipse cx="40" cy="93" rx="19" ry="4.5" fill="#000000" opacity="0.22"/>
     <path d="${VASE_PATH}" fill="url(#${ids.vaseBody})" stroke="${palette.stroke}" stroke-width="0.7"/>
     <path d="${VASE_PATH}" fill="url(#${ids.vaseShade})" stroke="none"/>
-    <g clip-path="url(#${ids.vaseClip})">${vasePatternMarkup(ids, color)}</g>
-    <path d="M26 73 Q40 68 54 73" fill="none" stroke="url(#${ids.vaseRim})" stroke-width="1.55"/>
-    <ellipse cx="40" cy="74.5" rx="14" ry="2.3" fill="#ffffff" opacity="0.42"/>
-    <path d="M37 58 C39 52 41 52 43 58 L42 73 L38 73 Z" fill="#1f5a2a" stroke="#12361a" stroke-width="0.45"/>
-    <path d="M36 60 Q40 57 44 60" fill="none" stroke="#3d8f4a" stroke-width="0.35" opacity="0.7"/>
-    `;
+    <g clip-path="url(#${ids.vaseClip})">${vasePatternMarkup(ids, color)}</g>`;
 }
 
 function petalPath(cx, cy, w, h, rot, fill, stroke = 'rgba(0,0,0,0.15)') {
     return `<path d="M${cx} ${cy - h} C${cx + w} ${cy - h * 0.35} ${cx + w * 0.85} ${cy + h * 0.55} ${cx} ${cy + h * 0.65} C${cx - w * 0.85} ${cy + h * 0.55} ${cx - w} ${cy - h * 0.35} ${cx} ${cy - h} Z" fill="${fill}" stroke="${stroke}" stroke-width="0.35" transform="rotate(${rot} ${cx} ${cy})"/>`;
 }
 
-const flowerDrawers = {
-    lotus(ids) {
-        let s = '';
-        for (let i = 0; i < 12; i++) {
-            const tone = i % 3 === 0 ? '#fff7fb' : i % 3 === 1 ? '#fce7f3' : '#fbcfe8';
-            s += petalPath(40, 36, 8, 13, i * 30, tone);
-        }
-        return `${s}
-        <circle cx="40" cy="36" r="5.5" fill="#fde68a" stroke="#ca8a04" stroke-width="0.45"/>
-        <circle cx="38.5" cy="34.5" r="1.4" fill="#fffef0" opacity="0.9"/>`;
-    },
-    marigold(ids) {
-        let s = '';
-        for (let i = 0; i < 24; i++) {
-            s += petalPath(40, 34, 3.8, 10, i * 15, i % 2 ? '#fbbf24' : '#f59e0b', '#92400e');
-        }
-        return `${s}<circle cx="40" cy="34" r="5.5" fill="#78350f" stroke="#451a03" stroke-width="0.5"/>`;
-    },
-    peony(ids) {
-        let s = '';
-        for (let i = 0; i < 14; i++) {
-            s += petalPath(40, 33, 7, 10, i * 25.7, i % 2 ? '#fecdd3' : '#fb7185');
-        }
-        for (let i = 0; i < 8; i++) {
-            s += petalPath(40, 33, 4.5, 7, i * 45 + 8, '#e11d48', '#881337');
-        }
-        return `${s}<circle cx="40" cy="33" r="3.5" fill="#fde047" opacity="0.9"/>`;
-    },
-    orchid(ids) {
-        return `
-        ${petalPath(40, 38, 13, 6, 0, '#ddd6fe', '#5b21b6')}
-        ${petalPath(27, 32, 8, 5, -38, '#c4b5fd', '#4c1d95')}
-        ${petalPath(53, 32, 8, 5, 38, '#c4b5fd', '#4c1d95')}
-        ${petalPath(40, 26, 4.5, 7, 0, '#a855f7', '#581c87')}
-        <path d="M39 38 L40 54 Q40 57 43 56" fill="none" stroke="#65a30d" stroke-width="1.2" stroke-linecap="round"/>
-        <ellipse cx="42" cy="55" rx="3.5" ry="2.2" fill="#eab308" stroke="#a16207" stroke-width="0.35"/>`;
-    },
-    rose(ids) {
-        let s = '';
-        for (let i = 0; i < 12; i++) {
-            s += petalPath(40, 34, 6.5, 8.5, i * 30, i < 6 ? '#fda4af' : '#e11d48', '#881337');
-        }
-        s += petalPath(40, 34, 3.5, 4.5, 15, '#9f1239');
-        return `${s}<circle cx="40" cy="34" r="2" fill="#4c0519"/>`;
-    },
-    chrysanthemum(ids) {
-        let s = '';
-        for (let i = 0; i < 28; i++) {
-            s += petalPath(40, 34, 2.8, 11, i * 12.85, i % 2 ? '#fde047' : '#facc15', '#b45309');
-        }
-        return `${s}<circle cx="40" cy="34" r="4.5" fill="#92400e"/>`;
-    },
-};
+function vaseRimMarkup(ids) {
+    return `
+    <path d="M26 73 Q40 68 54 73" fill="none" stroke="url(#${ids.vaseRim})" stroke-width="1.55"/>
+    <ellipse cx="40" cy="74.5" rx="14" ry="2.3" fill="#ffffff" opacity="0.42"/>`;
+}
+
+function stemPath(x1, y1, x2, y2, width = 1.1) {
+    return `<path d="M${x1} ${y1} Q${(x1 + x2) / 2} ${(y1 + y2) / 2 - 4} ${x2} ${y2}" fill="none" stroke="#166534" stroke-width="${width}" stroke-linecap="round"/>`;
+}
+
+function leafMarkup(cx, cy, rot, scale = 1) {
+    return `<ellipse cx="${cx}" cy="${cy}" rx="${4.5 * scale}" ry="${2.2 * scale}" fill="#22c55e" stroke="#14532d" stroke-width="0.35" transform="rotate(${rot} ${cx} ${cy})"/>`;
+}
+
+function lotusBloom(cx, cy, scale = 1) {
+    let petals = '';
+    for (let i = 0; i < 10; i++) {
+        const tone = i % 2 === 0 ? '#fff7fb' : '#fbcfe8';
+        petals += petalPath(cx, cy, 5.5 * scale, 9 * scale, i * 36, tone, '#be185d');
+    }
+
+    return `${petals}
+    <circle cx="${cx}" cy="${cy}" r="${3.2 * scale}" fill="#fde68a" stroke="#ca8a04" stroke-width="0.4"/>`;
+}
+
+function tulipBloom(cx, cy, color, scale = 1) {
+    const [a, b, c] = color;
+    return `
+    ${petalPath(cx, cy - 1 * scale, 3.2 * scale, 7.5 * scale, 0, a, b)}
+    ${petalPath(cx, cy - 1 * scale, 3.2 * scale, 7.5 * scale, 72, a, b)}
+    ${petalPath(cx, cy - 1 * scale, 3.2 * scale, 7.5 * scale, 144, a, b)}
+    ${petalPath(cx, cy - 1 * scale, 3.2 * scale, 7.5 * scale, 216, a, b)}
+    ${petalPath(cx, cy - 1 * scale, 3.2 * scale, 7.5 * scale, 288, a, b)}
+    <path d="M${cx} ${cy + 5 * scale} L${cx} ${cy + 14 * scale}" stroke="#15803d" stroke-width="${0.9 * scale}" stroke-linecap="round"/>
+    <ellipse cx="${cx - 2 * scale}" cy="${cy + 10 * scale}" rx="${2.2 * scale}" ry="${1 * scale}" fill="#4ade80" stroke="#166534" stroke-width="0.3" transform="rotate(-28 ${cx - 2 * scale} ${cy + 10 * scale})"/>`;
+}
+
+function sunflowerBloom(cx, cy, scale = 1) {
+    let rays = '';
+    for (let i = 0; i < 16; i++) {
+        rays += petalPath(cx, cy, 2.4 * scale, 7.5 * scale, i * 22.5, i % 2 ? '#fde047' : '#facc15', '#ca8a04');
+    }
+
+    return `${rays}
+    <circle cx="${cx}" cy="${cy}" r="${4.8 * scale}" fill="#92400e" stroke="#451a03" stroke-width="0.4"/>
+    <circle cx="${cx}" cy="${cy}" r="${3 * scale}" fill="#78350f"/>
+    ${Array.from({ length: 18 }, (_, i) => {
+        const a = (i / 18) * Math.PI * 2;
+        const x = cx + Math.cos(a) * 2.2 * scale;
+        const y = cy + Math.sin(a) * 2.2 * scale;
+        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${0.35 * scale}" fill="#451a03"/>`;
+    }).join('')}`;
+}
+
+function marigoldBloom(cx, cy, scale = 1) {
+    let petals = '';
+    for (let i = 0; i < 14; i++) {
+        petals += petalPath(cx, cy, 2.2 * scale, 6 * scale, i * 25.7, i % 2 ? '#fbbf24' : '#f59e0b', '#92400e');
+    }
+
+    return `${petals}<circle cx="${cx}" cy="${cy}" r="${2.2 * scale}" fill="#78350f"/>`;
+}
+
+function peonyBloom(cx, cy, scale = 1) {
+    let petals = '';
+    for (let i = 0; i < 10; i++) {
+        petals += petalPath(cx, cy, 4.5 * scale, 6.5 * scale, i * 36, i % 2 ? '#fecdd3' : '#fb7185', '#9f1239');
+    }
+
+    return `${petals}<circle cx="${cx}" cy="${cy}" r="${2 * scale}" fill="#fde047" opacity="0.9"/>`;
+}
+
+function roseBloom(cx, cy, scale = 1) {
+    let petals = '';
+    for (let i = 0; i < 8; i++) {
+        petals += petalPath(cx, cy, 3.8 * scale, 5.5 * scale, i * 45, i % 2 ? '#fda4af' : '#e11d48', '#881337');
+    }
+
+    return `${petals}<circle cx="${cx}" cy="${cy}" r="${1.6 * scale}" fill="#4c0519"/>`;
+}
+
+function bouquetMarkup(featured = 'lotus') {
+    const emphasis = {
+        lotus: { lotus: 1.12, tulip: 0.92, sunflower: 0.88, marigold: 0.82, peony: 0.86, rose: 0.84 },
+        tulip: { lotus: 0.9, tulip: 1.14, sunflower: 0.88, marigold: 0.84, peony: 0.86, rose: 0.88 },
+        sunflower: { lotus: 0.88, tulip: 0.9, sunflower: 1.16, marigold: 0.9, peony: 0.84, rose: 0.82 },
+        marigold: { lotus: 0.86, tulip: 0.88, sunflower: 0.9, marigold: 1.12, peony: 0.86, rose: 0.84 },
+        peony: { lotus: 0.88, tulip: 0.86, sunflower: 0.84, marigold: 0.82, peony: 1.14, rose: 0.88 },
+        rose: { lotus: 0.86, tulip: 0.9, sunflower: 0.84, marigold: 0.82, peony: 0.88, rose: 1.12 },
+    }[featured] ?? { lotus: 1, tulip: 1, sunflower: 1, marigold: 1, peony: 1, rose: 1 };
+
+    return `
+    ${stemPath(28, 73, 24, 44, 1)}
+    ${stemPath(36, 73, 34, 30, 1.05)}
+    ${stemPath(44, 73, 44, 26, 1.1)}
+    ${stemPath(52, 73, 56, 34, 1.05)}
+    ${stemPath(48, 73, 62, 42, 0.95)}
+    ${stemPath(32, 73, 18, 48, 0.9)}
+    ${leafMarkup(30, 58, -24, 0.95)}
+    ${leafMarkup(38, 52, 18, 0.9)}
+    ${leafMarkup(50, 56, -12, 0.85)}
+    ${leafMarkup(58, 60, 22, 0.8)}
+    ${leafMarkup(22, 62, -8, 0.75)}
+    ${lotusBloom(24, 40, emphasis.lotus)}
+    ${tulipBloom(34, 22, ['#fecdd3', '#be123c', '#fb7185'], emphasis.tulip)}
+    ${tulipBloom(46, 24, ['#ddd6fe', '#6d28d9', '#a78bfa'], emphasis.tulip * 0.95)}
+    ${sunflowerBloom(60, 36, emphasis.sunflower)}
+    ${marigoldBloom(18, 46, emphasis.marigold)}
+    ${peonyBloom(52, 16, emphasis.peony * 0.92)}
+    ${roseBloom(40, 14, emphasis.rose * 0.88)}`;
+}
+
+function vaseMarkup(ids, color = 'blue') {
+    return `${vaseBodyMarkup(ids, color)}${vaseRimMarkup(ids)}`;
+}
 
 export function flowerSvg(type, vaseColor = null) {
     const ids = nextSvgIds();
     const color = vaseColor && VASE_PALETTES[vaseColor] ? vaseColor : randomVaseColor();
-    const drawer = flowerDrawers[type] ?? flowerDrawers.lotus;
-    return `<svg class="offering-svg offering-svg--flower" viewBox="0 0 80 100" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids, color)}${drawer(ids)}${vaseMarkup(ids, color)}</svg>`;
+    const featured = FLOWER_TYPES.includes(type) ? type : 'lotus';
+
+    return `<svg class="offering-svg offering-svg--flower" viewBox="0 0 80 100" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids, color)}${vaseBodyMarkup(ids, color)}${bouquetMarkup(featured)}${vaseRimMarkup(ids)}</svg>`;
 }
 
 export function lampSvg({ lit = false, flameId = null } = {}) {
@@ -361,6 +419,38 @@ export function incenseSvg({ lit = true, sticks = 1 } = {}) {
     <ellipse cx="${center}" cy="61" rx="${17 + Math.max(0, count - 3) * 2}" ry="3.2" fill="#a8a29e"/>
     <ellipse cx="${center}" cy="59" rx="${19 + Math.max(0, count - 3) * 2}" ry="2.2" fill="#d6d3d1"/>
     ${stickMarkup}
+  </svg>`;
+}
+
+export function dranyenSvg() {
+    const ids = nextSvgIds();
+
+    return `<svg class="offering-svg offering-svg--dranyen" viewBox="0 0 80 100" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">${svgDefs(ids)}
+    <ellipse cx="40" cy="92" rx="18" ry="4" fill="#000" opacity="0.18"/>
+    <path d="M28 58 C24 72 26 84 40 86 C54 84 56 72 52 58 Z" fill="#7c2d12" stroke="#431407" stroke-width="0.7"/>
+    <path d="M28 58 C24 72 26 84 40 86 C54 84 56 72 52 58 Z" fill="url(#${ids.bronze})" opacity="0.22"/>
+    <path d="M30 60 C32 74 36 80 40 80 C44 80 48 74 50 60" fill="none" stroke="#fde68a" stroke-width="0.45" opacity="0.65"/>
+    <path d="M32 64 Q40 62 48 64" fill="none" stroke="#dc2626" stroke-width="0.55" opacity="0.75"/>
+    <path d="M33 68 Q40 66 47 68" fill="none" stroke="#059669" stroke-width="0.5" opacity="0.7"/>
+    <ellipse cx="40" cy="62" rx="11" ry="2.2" fill="url(#${ids.rim})" opacity="0.85"/>
+    <circle cx="40" cy="70" r="2.8" fill="#451a03" stroke="#fde68a" stroke-width="0.45"/>
+    <path d="M39 70 L39 48" stroke="#fde68a" stroke-width="0.35" opacity="0.55"/>
+    <path d="M41 70 L41 48" stroke="#fde68a" stroke-width="0.35" opacity="0.55"/>
+    <path d="M34 58 C36 46 38 34 40 18" fill="none" stroke="#92400e" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M34 58 C36 46 38 34 40 18" fill="none" stroke="url(#${ids.bronze})" stroke-width="1.1" stroke-linecap="round" opacity="0.55"/>
+    <rect x="36.5" y="16" width="7" height="5" rx="1.2" fill="#7c2d12" stroke="#431407" stroke-width="0.45"/>
+    <path d="M37 18 H43" stroke="url(#${ids.rim})" stroke-width="0.55"/>
+    <circle cx="38.5" cy="18.5" r="0.9" fill="#fde68a" stroke="#92400e" stroke-width="0.3"/>
+    <circle cx="41.5" cy="18.5" r="0.9" fill="#fde68a" stroke="#92400e" stroke-width="0.3"/>
+    <path d="M36 20 C34 24 33 30 34 36" fill="none" stroke="#451a03" stroke-width="0.55" stroke-linecap="round"/>
+    <path d="M44 20 C46 24 47 30 46 36" fill="none" stroke="#451a03" stroke-width="0.55" stroke-linecap="round"/>
+    <path d="M34 36 C42 34 46 38 52 42" fill="none" stroke="#fde68a" stroke-width="0.45" opacity="0.75"/>
+    <path d="M34 36 C42 34 46 38 52 42" fill="none" stroke="#451a03" stroke-width="0.25"/>
+    <path d="M34 36 L52 42" stroke="#fef3c7" stroke-width="0.35" opacity="0.8"/>
+    <path d="M34 36 L52 42" stroke="#fef3c7" stroke-width="0.35" opacity="0.8" transform="translate(0 1.2)"/>
+    <path d="M30 52 C34 50 38 49 42 50" fill="none" stroke="#dc2626" stroke-width="0.45" opacity="0.55"/>
+    <path d="M38 52 C42 51 46 52 50 54" fill="none" stroke="#059669" stroke-width="0.45" opacity="0.55"/>
+    <ellipse cx="40" cy="58" rx="12" ry="2.4" fill="#000" opacity="0.08"/>
   </svg>`;
 }
 

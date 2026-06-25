@@ -9,6 +9,8 @@ Route::post('/butter-lamps', [ShrineController::class, 'store']);
 Route::post('/mantra-repetitions', [ShrineController::class, 'storeMantra']);
 Route::post('/incense-offerings', [ShrineController::class, 'storeIncense']);
 Route::post('/flower-offerings', [ShrineController::class, 'storeFlower']);
+Route::post('/music-offerings', [ShrineController::class, 'storeMusic']);
+Route::post('/music-suggestions', [ShrineController::class, 'storeMusicSuggestion']);
 Route::post('/water-bowls/acquire', [ShrineController::class, 'acquireWaterLock']);
 Route::post('/water-bowls/fill', [ShrineController::class, 'fillWaterBowl']);
 Route::post('/practitioner-presence', [ShrineController::class, 'heartbeat']);
