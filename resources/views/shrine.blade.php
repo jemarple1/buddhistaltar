@@ -33,15 +33,15 @@
             <div class="deity-title-row mt-4 px-4">
                 <div class="deity-title">
                     <h1 class="font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">
-                        Namo<br class="sm:hidden"> Avalokiteshvaraya!
+                        Namo Avalokiteshvaraya!
                     </h1>
                     <p class="mt-1 italic text-white/85 drop-shadow-sm">
-                        Homage to<br class="sm:hidden"> The One Who Looks Upon Beings<br class="sm:hidden"> with Compassion!
+                        Homage to The One Who Looks Upon Beings with Compassion!
                     </p>
                 </div>
             </div>
 
-            <div id="shrine-altar" class="shrine-altar mt-6 px-4">
+            <div id="shrine-altar" class="shrine-altar mt-6 px-2 sm:px-4">
                 <div class="altar-row altar-row-incense-water">
                     <div class="altar-incense-flank altar-incense-flank--left">
                         <div class="incense-shrine incense-shrine--flank" aria-label="Burning incense offering on the left"></div>

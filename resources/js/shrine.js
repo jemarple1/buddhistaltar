@@ -211,11 +211,15 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;');
 }
 
-function youtubeEmbedUrl(youtubeId, { mute = true, autoplay = true, start = 0 } = {}) {
+function isCoarsePointerDevice() {
+    return window.matchMedia('(max-width: 639px), (pointer: coarse)').matches;
+}
+
+function youtubeEmbedUrl(youtubeId, { mute = true, autoplay = true, start = 0, controls = true } = {}) {
     const params = new URLSearchParams({
         autoplay: autoplay ? '1' : '0',
         mute: mute ? '1' : '0',
-        controls: '0',
+        controls: controls ? '1' : '0',
         modestbranding: '1',
         rel: '0',
         playsinline: '1',
@@ -256,8 +260,29 @@ function unmuteMusicPlayer(playerEl, youtubeId, start = 0) {
         return;
     }
 
-    iframe.src = youtubeEmbedUrl(youtubeId, { mute: false, autoplay: true, start });
+    iframe.hidden = false;
+    iframe.src = youtubeEmbedUrl(youtubeId, { mute: false, autoplay: true, start, controls: true });
     btn?.classList.add('is-unmuted');
+}
+
+function startMusicPlayer(playerEl, track) {
+    const iframe = playerEl.querySelector('iframe');
+    const overlay = playerEl.querySelector('.music-play-overlay');
+    if (!iframe || playerEl.dataset.playing === 'true') {
+        return;
+    }
+
+    playerEl.dataset.playing = 'true';
+    overlay?.remove();
+
+    const start = track.youtube_start_seconds ?? 0;
+    iframe.hidden = false;
+    iframe.src = youtubeEmbedUrl(track.youtube_id, {
+        mute: false,
+        autoplay: true,
+        start,
+        controls: true,
+    });
 }
 
 function createMusicPlayerElement(offering) {
@@ -266,25 +291,50 @@ function createMusicPlayerElement(offering) {
     player.dataset.offeringId = String(offering.id);
     const track = offering.track;
     const start = track.youtube_start_seconds ?? 0;
-    const embedUrl = youtubeEmbedUrl(track.youtube_id, { mute: true, autoplay: true, start });
+    const mobile = isCoarsePointerDevice();
 
-    player.innerHTML = `
-        <div class="music-player-frame">
-            <iframe
-                src="${embedUrl}"
-                title="${escapeHtml(track.title)}"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerpolicy="strict-origin-when-cross-origin"
-                allowfullscreen
-            ></iframe>
-        </div>
-        <button type="button" class="music-unmute-btn">Unmute</button>
-        ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
-    `;
+    if (mobile) {
+        player.innerHTML = `
+            <div class="music-player-frame">
+                <button type="button" class="music-play-overlay" aria-label="Play ${escapeHtml(track.title)}">
+                    <img class="music-play-overlay-thumb" src="${escapeHtml(track.thumbnail_url)}" alt="">
+                    <span class="music-play-overlay-icon" aria-hidden="true"></span>
+                </button>
+                <iframe
+                    hidden
+                    title="${escapeHtml(track.title)}"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allowfullscreen
+                ></iframe>
+            </div>
+            ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
+        `;
 
-    player.querySelector('.music-unmute-btn')?.addEventListener('click', () => {
-        unmuteMusicPlayer(player, track.youtube_id, start);
-    });
+        player.querySelector('.music-play-overlay')?.addEventListener('click', () => {
+            startMusicPlayer(player, track);
+        });
+    } else {
+        const embedUrl = youtubeEmbedUrl(track.youtube_id, { mute: true, autoplay: true, start, controls: true });
+
+        player.innerHTML = `
+            <div class="music-player-frame">
+                <iframe
+                    src="${embedUrl}"
+                    title="${escapeHtml(track.title)}"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allowfullscreen
+                ></iframe>
+            </div>
+            <button type="button" class="music-unmute-btn">Unmute</button>
+            ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
+        `;
+
+        player.querySelector('.music-unmute-btn')?.addEventListener('click', () => {
+            unmuteMusicPlayer(player, track.youtube_id, start);
+        });
+    }
 
     return player;
 }
