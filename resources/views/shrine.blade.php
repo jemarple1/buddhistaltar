@@ -31,26 +31,37 @@
             </div>
 
             <div class="deity-title-row mt-4 px-4">
-                <div class="incense-shrine" aria-label="Burning incense offering on the left"></div>
-
                 <div class="deity-title">
-                    <h1 class="text-xl font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">Namo Avalokiteshvaraya!</h1>
-                    <p class="mt-1 text-sm italic text-white/85 drop-shadow-sm">Homage to The One Who Looks Upon Beings with Compassion!</p>
+                    <h1 class="font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">
+                        Namo<br class="sm:hidden"> Avalokiteshvaraya!
+                    </h1>
+                    <p class="mt-1 italic text-white/85 drop-shadow-sm">
+                        Homage to<br class="sm:hidden"> The One Who Looks Upon Beings<br class="sm:hidden"> with Compassion!
+                    </p>
                 </div>
-
-                <div class="incense-shrine" aria-label="Burning incense offering on the right"></div>
             </div>
 
-            <div id="incense-shrine-extra" class="incense-shrine-extra hidden" aria-label="Additional incense offerings"></div>
-
             <div id="shrine-altar" class="shrine-altar mt-6 px-4">
-                <div class="altar-row altar-row-water">
-                    <div id="offered-water-bowls" class="water-bowls-display hidden" aria-label="Water bowl offerings">
-                        @for ($i = 1; $i <= 7; $i++)
-                            <div class="water-bowl water-bowl-filled" data-position="{{ $i }}" hidden></div>
-                        @endfor
+                <div class="altar-row altar-row-incense-water">
+                    <div class="altar-incense-flank altar-incense-flank--left">
+                        <div class="incense-shrine incense-shrine--flank" aria-label="Burning incense offering on the left"></div>
+                    </div>
+
+                    <div class="water-shrine-group">
+                        <div id="offered-water-bowls" class="water-bowls-display" aria-label="Water bowl offerings">
+                            @for ($i = 1; $i <= 7; $i++)
+                                <div class="water-bowl water-bowl-shrine" data-position="{{ $i }}"></div>
+                            @endfor
+                        </div>
+                        <span id="water-shrine-name" class="water-offering-name hidden" aria-hidden="true"></span>
+                    </div>
+
+                    <div class="altar-incense-flank altar-incense-flank--right">
+                        <div class="incense-shrine incense-shrine--flank" aria-label="Burning incense offering on the right"></div>
                     </div>
                 </div>
+
+                <div id="incense-shrine-extra" class="incense-shrine-extra hidden" aria-label="Additional incense offerings"></div>
             </div>
 
             <div id="offered-flowers" class="offering-row offering-row--flowers mt-4 px-4" aria-label="Flower offerings">
@@ -87,7 +98,7 @@
                         {{-- Incense --}}
                         <div class="offering-column">
                             <h3 class="offering-column-title">Incense</h3>
-                            <p class="offering-column-desc">Adds a stick for fifteen minutes</p>
+                            <p class="offering-column-desc">Adds a stick for twenty-four hours</p>
                             <div class="offering-preview incense-preview"></div>
                             <input type="text" id="incense-name" maxlength="100" placeholder="Name (optional)" class="name-input mt-4 w-full rounded px-3 py-2 text-sm italic">
                             <button type="button" id="btn-offer-incense" class="btn-shrine mt-3 w-full rounded px-4 py-2.5 text-sm tracking-wide">Offer incense</button>
@@ -96,20 +107,16 @@
                         {{-- Water bowls --}}
                         <div class="offering-column">
                             <h3 class="offering-column-title">Water Bowls</h3>
-                            <p id="water-status" class="offering-column-desc">Seven bowls — one offering at a time</p>
-                            <div id="water-bowls-ui" class="water-bowls-ui mt-2">
-                                <div id="water-bowls-stack" class="water-bowls-stack">
+                            <p class="offering-column-desc">Offer seven bowls of pure water</p>
+                            <div class="offering-preview">
+                                <div id="water-offering-preview" class="water-bowls-preview" aria-hidden="true">
                                     @for ($i = 1; $i <= 7; $i++)
-                                        <div class="water-bowl water-bowl-stacked" style="--stack-index: {{ $i - 1 }}"></div>
-                                    @endfor
-                                </div>
-                                <div id="water-bowls-active" class="water-bowls-active hidden">
-                                    @for ($i = 1; $i <= 7; $i++)
-                                        <button type="button" class="water-bowl water-bowl-offer" data-position="{{ $i }}" aria-label="Fill water bowl {{ $i }}"></button>
+                                        <div class="water-bowl water-bowl-preview" data-position="{{ $i }}"></div>
                                     @endfor
                                 </div>
                             </div>
-                            <button type="button" id="btn-begin-water" class="btn-shrine mt-4 w-full rounded px-4 py-2.5 text-sm tracking-wide">Begin water offering</button>
+                            <input type="text" id="water-name" maxlength="100" placeholder="Name (optional)" class="name-input mt-4 w-full rounded px-3 py-2 text-sm italic">
+                            <button type="button" id="btn-offer-water" class="btn-shrine mt-3 w-full rounded px-4 py-2.5 text-sm tracking-wide">Offer water</button>
                         </div>
 
                         {{-- Flowers --}}
@@ -184,7 +191,6 @@
         </footer>
     </div>
 
-    <div id="water-pitcher" class="water-pitcher hidden" aria-hidden="true"></div>
 
     <div id="cookie-consent" class="cookie-consent" hidden aria-hidden="true" role="dialog" aria-labelledby="cookie-consent-title">
         <p id="cookie-consent-title" class="cookie-consent-text">This site uses cookies and local storage to remember your preferences and offering session.</p>
@@ -268,7 +274,7 @@
                 <button type="button" id="btn-close-music-modal" class="shrine-modal-close" aria-label="Close music selection">&times;</button>
             </div>
             <div class="shrine-modal-body">
-                <p class="text-sm text-sky-950/70">Select a piece to offer before the shrine. It will join the music row for fifteen minutes.</p>
+                <p class="text-sm text-sky-950/70">Select a piece to offer before the shrine. It will join the music row for twenty-four hours.</p>
                 <div id="music-catalog" class="music-catalog-grid mt-4" role="list"></div>
 
                 <div class="music-suggest-panel mt-6 border-t border-sky-900/10 pt-5">

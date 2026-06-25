@@ -8,6 +8,7 @@ class MantraRepetition extends Model
 {
     protected $fillable = [
         'count',
+        'visitor_token',
     ];
 
     protected function casts(): array

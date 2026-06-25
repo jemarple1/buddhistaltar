@@ -8,6 +8,8 @@ class WaterBowlSession extends Model
 {
     protected $fillable = [
         'token',
+        'visitor_token',
+        'name',
         'filled_positions',
         'expires_at',
         'completed_at',

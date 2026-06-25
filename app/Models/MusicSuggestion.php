@@ -9,5 +9,6 @@ class MusicSuggestion extends Model
     protected $fillable = [
         'youtube_url',
         'suggested_by_name',
+        'visitor_token',
     ];
 }

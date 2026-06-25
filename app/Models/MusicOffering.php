@@ -10,6 +10,7 @@ class MusicOffering extends Model
     protected $fillable = [
         'music_track_id',
         'name',
+        'visitor_token',
         'expires_at',
     ];
 

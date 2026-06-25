@@ -8,5 +8,14 @@ class ButterLamp extends Model
 {
     protected $fillable = [
         'name',
+        'visitor_token',
+        'expires_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+        ];
+    }
 }

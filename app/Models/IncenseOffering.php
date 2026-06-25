@@ -8,6 +8,7 @@ class IncenseOffering extends Model
 {
     protected $fillable = [
         'name',
+        'visitor_token',
         'expires_at',
     ];
 

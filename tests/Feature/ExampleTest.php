@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const VISITOR_TOKEN = '550e8400-e29b-41d4-a716-446655440000';
 
     protected function setUp(): void
     {
@@ -16,13 +19,20 @@ class ExampleTest extends TestCase
         $this->withoutVite();
     }
 
+    private function visitorPayload(array $extra = []): array
+    {
+        return array_merge(['visitor_token' => self::VISITOR_TOKEN], $extra);
+    }
+
     public function test_the_shrine_page_loads(): void
     {
         $response = $this->get('/');
 
         $response->assertStatus(200);
-        $response->assertSee('Namo Avalokiteshvaraya!');
-        $response->assertSee('Homage to The One Who Looks Upon Beings with Compassion!');
+        $response->assertSee('Namo');
+        $response->assertSee('Avalokiteshvaraya!');
+        $response->assertSee('Homage to');
+        $response->assertSee('with Compassion!');
         $response->assertSee('Offerings');
         $response->assertSee('Incense');
         $response->assertSee('Water Bowls');
@@ -43,9 +53,9 @@ class ExampleTest extends TestCase
 
     public function test_a_butter_lamp_can_be_offered(): void
     {
-        $response = $this->postJson('/butter-lamps', [
+        $response = $this->postJson('/butter-lamps', $this->visitorPayload([
             'name' => 'Tenzin',
-        ]);
+        ]));
 
         $response->assertCreated();
         $response->assertJsonPath('lamp.name', 'Tenzin');
@@ -55,21 +65,24 @@ class ExampleTest extends TestCase
 
     public function test_mantra_repetitions_are_pooled(): void
     {
-        $response = $this->postJson('/mantra-repetitions', ['count' => 108]);
+        $response = $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 108]));
         $response->assertCreated();
         $response->assertJsonPath('total_count', 108);
 
-        $response = $this->postJson('/mantra-repetitions', ['count' => 7]);
+        $response = $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 7]));
         $response->assertJsonPath('total_count', 115);
     }
 
     public function test_incense_offering_adds_stick_and_sets_expiry(): void
     {
-        $response = $this->postJson('/incense-offerings', ['name' => 'Sam']);
+        $response = $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Sam']));
         $response->assertCreated();
         $response->assertJsonStructure(['offering' => ['expires_at'], 'shrine_state']);
-        $response->assertJsonPath('shrine_state.incense.sticks', 2);
+        $response->assertJsonPath('shrine_state.incense.sticks', 3);
         $response->assertJsonPath('shrine_state.incense.active_offerings', 1);
+
+        $expiresAt = Carbon::parse($response->json('offering.expires_at'));
+        $this->assertTrue($expiresAt->between(now()->addHours(23), now()->addHours(25)));
     }
 
     public function test_practitioner_heartbeat_returns_live_count(): void
@@ -91,10 +104,10 @@ class ExampleTest extends TestCase
     {
         $trackId = (int) \Illuminate\Support\Facades\DB::table('music_tracks')->value('id');
 
-        $response = $this->postJson('/music-offerings', [
+        $response = $this->postJson('/music-offerings', $this->visitorPayload([
             'track_id' => $trackId,
             'name' => 'Mila',
-        ]);
+        ]));
 
         $response->assertCreated();
         $response->assertJsonPath('offering.name', 'Mila');
@@ -107,10 +120,10 @@ class ExampleTest extends TestCase
 
     public function test_music_suggestion_is_stored(): void
     {
-        $response = $this->postJson('/music-suggestions', [
+        $response = $this->postJson('/music-suggestions', $this->visitorPayload([
             'url' => 'https://www.youtube.com/watch?v=abc123xyz12',
             'name' => 'Sam',
-        ]);
+        ]));
 
         $response->assertCreated();
         $this->assertDatabaseHas('music_suggestions', [
@@ -119,29 +132,80 @@ class ExampleTest extends TestCase
         ]);
     }
 
-    public function test_water_offering_locks_for_one_person_at_a_time(): void
+    public function test_water_offering_can_be_made_with_a_name(): void
     {
-        $first = $this->postJson('/water-bowls/acquire', []);
-        $first->assertCreated();
-        $token = $first->json('session.token');
+        $response = $this->postJson('/water-offerings', $this->visitorPayload(['name' => 'Tenzin']));
 
-        $second = $this->postJson('/water-bowls/acquire', []);
-        $second->assertStatus(423);
-
-        $fill = $this->postJson('/water-bowls/fill', [
-            'token' => $token,
-            'position' => 1,
+        $response->assertCreated();
+        $response->assertJsonPath('offering.name', 'Tenzin');
+        $response->assertJsonPath('shrine_state.water.display_positions', [1, 2, 3, 4, 5, 6, 7]);
+        $response->assertJsonPath('shrine_state.water.display_name', 'Tenzin');
+        $this->assertDatabaseHas('water_bowl_sessions', [
+            'name' => 'Tenzin',
         ]);
-        $fill->assertOk();
-        $fill->assertJsonPath('session.filled_positions.0', 1);
     }
 
     public function test_flower_offering_is_stored(): void
     {
-        $response = $this->postJson('/flower-offerings', ['name' => 'Lotus']);
+        $response = $this->postJson('/flower-offerings', $this->visitorPayload(['name' => 'Lotus']));
         $response->assertCreated();
         $response->assertJsonPath('offering.name', 'Lotus');
         $response->assertJsonStructure(['offering' => ['flower_type', 'vase_color']]);
         $this->assertContains($response->json('offering.vase_color'), ['blue', 'white', 'yellow', 'red', 'green']);
+    }
+
+    public function test_offering_state_includes_lamps_and_mantra_total(): void
+    {
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 21]))->assertCreated();
+
+        $response = $this->getJson('/offerings/state?visitor_token='.self::VISITOR_TOKEN);
+
+        $response->assertOk();
+        $response->assertJsonPath('lamps.0.name', 'Tenzin');
+        $response->assertJsonPath('mantra_total', 21);
+    }
+
+    public function test_profanity_in_offering_names_is_rejected(): void
+    {
+        $response = $this->postJson('/flower-offerings', $this->visitorPayload([
+            'name' => 'bad shit',
+        ]));
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_visitor_is_limited_to_three_offerings_per_type(): void
+    {
+        foreach (['One', 'Two', 'Three'] as $name) {
+            $this->postJson('/incense-offerings', $this->visitorPayload(['name' => $name]))
+                ->assertCreated();
+        }
+
+        $response = $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Four']));
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['visitor_token']);
+    }
+
+    public function test_offerings_expire_after_twenty_four_hours(): void
+    {
+        $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Sam']))->assertCreated();
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/water-offerings', $this->visitorPayload(['name' => 'Mila']))->assertCreated();
+
+        $response = $this->getJson('/offerings/state');
+        $response->assertJsonPath('incense.active_offerings', 1);
+        $response->assertJsonPath('lamps.0.name', 'Tenzin');
+        $response->assertJsonPath('water.display_name', 'Mila');
+
+        $this->travel(25)->hours();
+
+        $response = $this->getJson('/offerings/state');
+        $response->assertJsonPath('incense.active_offerings', 0);
+        $response->assertJsonPath('incense.sticks', 2);
+        $response->assertJsonPath('lamps', []);
+        $response->assertJsonPath('water.display_name', null);
     }
 }

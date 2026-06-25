@@ -219,7 +219,27 @@
 
     .offering-svg--incense {
         width: 3.75rem;
+        max-width: 100%;
         filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.15));
+    }
+
+    @media (max-width: 639px) {
+        .altar-incense-flank .offering-svg--incense,
+        .incense-shrine-extra .offering-svg--incense {
+            width: clamp(2.35rem, 11vw, 3rem);
+        }
+
+        .altar-row-incense-water {
+            gap: 0.25rem 0.4rem;
+        }
+
+        .incense-shrine-extra {
+            gap: 0.35rem 0.5rem;
+        }
+
+        .offering-svg--water {
+            width: 2.35rem;
+        }
     }
 
     .offering-svg--water {
@@ -305,7 +325,8 @@
     }
 
     .offering-name,
-    .lamp-name {
+    .lamp-name,
+    .water-offering-name {
         font-size: 0.65rem;
         color: rgba(255, 255, 255, 0.9);
         text-align: center;
@@ -355,31 +376,75 @@
         gap: 0.75rem 1rem;
     }
 
-    .altar-row-water {
-        justify-content: center;
+    .altar-row-incense-water {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 0.35rem 0.65rem;
         width: 100%;
     }
 
-    .deity-title-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-        align-items: end;
-        gap: 0.75rem 1rem;
+    .altar-incense-flank {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .altar-incense-flank--left {
+        justify-self: end;
+    }
+
+    .altar-incense-flank--right {
+        justify-self: start;
+    }
+
+    .water-shrine-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+        min-width: 0;
         width: 100%;
-        max-width: 36rem;
+    }
+
+    .water-offering-name {
+        display: block;
+        max-width: 100%;
+    }
+
+    .water-offering-name.hidden {
+        display: none;
+    }
+
+    .deity-title-row {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        max-width: min(36rem, 100%);
         margin-inline: auto;
+        box-sizing: border-box;
     }
 
     .deity-title {
         text-align: center;
         padding-bottom: 0.15rem;
-        max-width: min(100%, 22rem);
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
         margin-inline: auto;
     }
 
+    .deity-title h1 {
+        font-size: clamp(0.875rem, 3.6vw, 1.5rem);
+        line-height: 1.25;
+        text-wrap: balance;
+    }
+
     .deity-title p {
-        font-size: clamp(0.7rem, 2.4vw, 0.875rem);
+        font-size: clamp(0.65rem, 2.8vw, 0.875rem);
         line-height: 1.35;
+        text-wrap: balance;
     }
 
     .deity-title-row .incense-shrine:first-child {
@@ -390,16 +455,20 @@
         justify-self: start;
     }
 
+    .altar-incense-flank .incense-shrine,
+    .deity-title-row .incense-shrine {
+        flex-shrink: 0;
+    }
+
     .incense-shrine-extra {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
         align-items: end;
-        gap: 0.75rem 1.25rem;
+        gap: 0.5rem 0.75rem;
         width: 100%;
-        max-width: 36rem;
-        margin-inline: auto;
-        margin-top: 0.35rem;
+        margin-top: 0.65rem;
+        box-sizing: border-box;
     }
 
     .incense-shrine-extra.hidden {
@@ -447,6 +516,28 @@
         animation: syllable-rise var(--rise-duration, 11s) ease-out forwards;
     }
 
+    .syllable-particle--lamp-ray {
+        transform: translate(-50%, -50%);
+        animation: syllable-lamp-ray var(--ray-duration, 6s) ease-out forwards;
+        text-shadow:
+            0 0 4px currentColor,
+            0 0 10px rgba(255, 215, 100, 0.95),
+            0 0 22px rgba(255, 175, 45, 0.6),
+            0 0 38px rgba(255, 140, 20, 0.32);
+    }
+
+    .syllable-particle--descending {
+        transform: translate(-50%, -50%);
+        animation: syllable-descend var(--descend-duration, 4s) ease-in-out forwards;
+        z-index: 2;
+    }
+
+    .syllable-particle--hovering {
+        transform: translate(-50%, -50%);
+        animation: syllable-hover-dissolve var(--hover-duration, 3s) ease-in-out forwards;
+        z-index: 2;
+    }
+
     .syllable-particle--om {
         color: rgba(255, 255, 255, 0.92);
     }
@@ -459,48 +550,20 @@
         color: rgba(59, 130, 246, 0.9);
     }
 
-    .water-bowls-ui {
-        position: relative;
-        min-height: 5.5rem;
-        width: 100%;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-    }
-
-    .water-bowls-stack {
-        position: relative;
-        width: 3rem;
-        height: 4.5rem;
-        cursor: pointer;
-    }
-
-    .water-bowls-stack.hidden {
-        display: none;
-    }
-
-    .water-bowls-active {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.35rem;
-        width: 100%;
-    }
-
-    .water-bowls-active.hidden {
-        display: none;
-    }
-
     .water-bowls-display {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: center;
-        gap: 0.25rem;
-        min-width: 11rem;
+        gap: 0.15rem 0.2rem;
+        width: 100%;
+        min-width: 0;
     }
 
-    .water-bowls-display.hidden {
-        display: none;
+    .water-bowls-preview {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.2rem 0.35rem;
     }
 
     .water-bowl {
@@ -509,56 +572,25 @@
         align-items: center;
     }
 
-    .water-bowl-stacked {
-        position: absolute;
-        bottom: calc(var(--stack-index) * 0.35rem);
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: calc(10 - var(--stack-index));
+    .water-bowl-shrine .offering-svg--water {
+        width: clamp(1.65rem, 4.2vw, 2.65rem);
     }
 
-    .water-bowl-offer {
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        padding: 0.15rem;
-        transition: transform 0.15s ease;
+    .water-bowl-preview .offering-svg--water {
+        width: 2rem;
     }
 
-    .water-bowl-offer:hover:not(:disabled):not(.filled) {
-        transform: translateY(-2px);
-    }
-
-    .water-bowl-offer:disabled,
-    .water-bowl-offer.filled {
-        cursor: default;
-        opacity: 0.85;
-    }
-
-    .water-pitcher {
+    .flying-water-bowl {
         position: fixed;
-        z-index: 120;
+        z-index: 180;
         pointer-events: none;
-        width: 2.75rem;
-        height: 3.5rem;
-        transition: left 0.5s ease, top 0.5s ease, opacity 0.3s ease;
+        transform: translate(-50%, -50%);
+        will-change: transform, opacity;
     }
 
-    .water-pitcher.hidden {
-        opacity: 0;
-    }
-
-    .pitcher-stream {
-        position: absolute;
-        bottom: 0.25rem;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 3px;
-        height: 0;
-        background: linear-gradient(180deg, rgba(186, 230, 253, 0.95), rgba(56, 189, 248, 0.85));
-        border-radius: 2px;
-        box-shadow: 0 0 8px rgba(125, 211, 252, 0.65);
-        animation: pour-stream 0.9s ease-in forwards;
+    .flying-water-bowl .offering-svg--water {
+        width: 2.35rem;
+        filter: drop-shadow(0 4px 12px rgba(56, 189, 248, 0.35));
     }
 
     .offered-flower {
@@ -1048,6 +1080,71 @@
         opacity: 0;
         transform: translate(-50%, -50%) translate(calc(var(--drift-x) * 1.08), calc(var(--drift-y) * 0.92))
             scale(0.88);
+    }
+}
+
+@keyframes syllable-lamp-ray {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.4);
+    }
+    10% {
+        opacity: 1;
+    }
+    40% {
+        opacity: 0.92;
+        transform: translate(calc(-50% + var(--ray-x) * 0.42), calc(-50% + var(--ray-y) * 0.42)) scale(0.78);
+    }
+    72% {
+        opacity: 0.55;
+        transform: translate(calc(-50% + var(--ray-x) * 0.82), calc(-50% + var(--ray-y) * 0.82)) scale(0.62);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--ray-x)), calc(-50% + var(--ray-y))) scale(0.48);
+    }
+}
+
+@keyframes syllable-descend {
+    0% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(-50%, -50%) scale(1);
+    }
+    38% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(calc(-50% + var(--descend-sway-x)), calc(-50% + var(--descend-y) * 0.38)) scale(1);
+    }
+    72% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(calc(-50% + var(--descend-mid-x)), calc(-50% + var(--descend-mid-y))) scale(1);
+    }
+    100% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(calc(-50% + var(--descend-x)), calc(-50% + var(--descend-y))) scale(1);
+    }
+}
+
+@keyframes syllable-hover-dissolve {
+    0%,
+    58% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(-50%, -50%) scale(1);
+    }
+    22% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(-50%, calc(-50% - 6px)) scale(1);
+    }
+    44% {
+        opacity: var(--peak-opacity, 0.65);
+        transform: translate(-50%, calc(-50% + 5px)) scale(1);
+    }
+    78% {
+        opacity: calc(var(--peak-opacity, 0.65) * 0.72);
+        transform: translate(-50%, -50%) scale(0.82);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.28);
     }
 }
 

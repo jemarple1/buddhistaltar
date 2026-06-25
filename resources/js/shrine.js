@@ -8,7 +8,6 @@ import {
     incenseSvg,
     dranyenSvg,
     waterBowlSvg,
-    waterPitcherSvg,
 } from './offering-graphics.js';
 
 const OFFERING_FLAME_ID = 'offering-flame';
@@ -31,7 +30,9 @@ const BTN_CLOSE_SUTRA_ID = 'btn-close-sutra';
 const BTN_CLOSE_LAMP_MODAL_ID = 'btn-close-lamp-modal';
 const BTN_OFFER_INCENSE_ID = 'btn-offer-incense';
 const BTN_OFFER_FLOWER_ID = 'btn-offer-flower';
-const BTN_BEGIN_WATER_ID = 'btn-begin-water';
+const BTN_OFFER_WATER_ID = 'btn-offer-water';
+const WATER_NAME_ID = 'water-name';
+const WATER_SHRINE_NAME_ID = 'water-shrine-name';
 const BTN_OFFER_MUSIC_ID = 'btn-offer-music';
 const BTN_CLOSE_MUSIC_MODAL_ID = 'btn-close-music-modal';
 const BTN_SUBMIT_MUSIC_SUGGESTION_ID = 'btn-submit-music-suggestion';
@@ -40,18 +41,15 @@ const MUSIC_CATALOG_ID = 'music-catalog';
 const MUSIC_NAME_ID = 'music-name';
 const MUSIC_SUGGEST_URL_ID = 'music-suggest-url';
 const MUSIC_SUGGEST_STATUS_ID = 'music-suggest-status';
-const INCENSE_SHRINE_SELECTOR = '.deity-title-row .incense-shrine, #incense-shrine-extra .incense-shrine';
+const INCENSE_SHRINE_SELECTOR = '.altar-incense-flank .incense-shrine, #incense-shrine-extra .incense-shrine';
 const INCENSE_SHRINE_EXTRA_ID = 'incense-shrine-extra';
 const MAX_STICKS_PER_HOLDER = 3;
 const SYLLABLE_SMOKE_ID = 'syllable-smoke';
-const WATER_STACK_ID = 'water-bowls-stack';
-const WATER_ACTIVE_ID = 'water-bowls-active';
-const WATER_STATUS_ID = 'water-status';
 const OFFERED_WATER_ID = 'offered-water-bowls';
-const WATER_PITCHER_ID = 'water-pitcher';
-const WATER_TOKEN_KEY = 'shrine_water_token';
-const PRACTITIONER_TOKEN_KEY = 'shrine_practitioner_token';
+const VISITOR_TOKEN_KEY = 'shrine_visitor_token';
+const PRACTITIONER_TOKEN_KEY = VISITOR_TOKEN_KEY;
 const LIVE_PRACTITIONERS_COUNT_ID = 'live-practitioners-count';
+const SHRINE_POLL_MS = 4000;
 const COOKIE_CONSENT_KEY = 'shrine_cookies_accepted';
 const REFUGE_DISMISSED_KEY = 'shrine_refuge_dismissed';
 const COOKIE_CONSENT_ID = 'cookie-consent';
@@ -76,10 +74,11 @@ let isOffering = false;
 let isAddingMantra = false;
 let shrineState = {};
 let offeredLamps = [];
-let waterToken = sessionStorage.getItem(WATER_TOKEN_KEY);
 let syllableCloudInterval = null;
 let syllableRiseInterval = null;
+let syllableLampRayInterval = null;
 let statePollInterval = null;
+let shrinePollInterval = null;
 let practitionerHeartbeatInterval = null;
 
 const CLOUD_TARGET_BASE = 36;
@@ -94,6 +93,11 @@ const RISE_INTERVAL_MIN = 110;
 const CLOUD_MAINTAIN_BASE = 950;
 const CLOUD_MAINTAIN_PER_STICK = 55;
 const CLOUD_MAINTAIN_MIN = 450;
+const CLOUD_DISSOLVE_AT = 0.78;
+const LAMP_RAY_INTERVAL_BASE = 2600;
+const LAMP_RAY_INTERVAL_PER_LAMP = 220;
+const LAMP_RAY_INTERVAL_MIN = 750;
+const OFFERING_NAME_SELECTOR = '.offering-name, .lamp-name, .music-offering-name, .water-offering-name';
 
 let syllableSmokeStartedAt = 0;
 let currentIncenseSticks = 1;
@@ -102,6 +106,51 @@ let isSelectingMusic = false;
 
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
+function getVisitorToken() {
+    let token = sessionStorage.getItem(VISITOR_TOKEN_KEY);
+    if (!token) {
+        token = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem(VISITOR_TOKEN_KEY, token);
+    }
+
+    return token;
+}
+
+function offeringPayload(extra = {}) {
+    return {
+        visitor_token: getVisitorToken(),
+        ...extra,
+    };
+}
+
+function offeringErrorMessage(data, fallback) {
+    if (typeof data?.message === 'string' && data.message !== '') {
+        return data.message;
+    }
+
+    const errors = data?.errors ?? {};
+    for (const messages of Object.values(errors)) {
+        if (Array.isArray(messages) && messages[0]) {
+            return messages[0];
+        }
+    }
+
+    return fallback;
+}
+
+function mergeShrineState(nextState) {
+    if (nextState && typeof nextState === 'object') {
+        shrineState = nextState;
+    }
+}
+
+function updateMantraTotal(total) {
+    const totalEl = document.getElementById(MANTRA_TOTAL_ID);
+    if (totalEl && typeof total === 'number') {
+        totalEl.textContent = formatCount(total);
+    }
 }
 
 function loadInitialState() {
@@ -116,9 +165,7 @@ function loadInitialState() {
         shrineState = {};
     }
 
-    seedOfferedLamps();
     applyShrineState();
-    renderLamps(offeredLamps);
 }
 
 function formatCount(value) {
@@ -146,11 +193,14 @@ function renderDedication(names) {
 
 function applyShrineState() {
     updateIncenseDisplay(shrineState.incense);
-    renderFlowers(shrineState.flowers ?? []);
+    syncFlowers(shrineState.flowers ?? []);
+    syncLamps(shrineState.lamps ?? []);
     renderMusicOfferings(shrineState.music);
     applyWaterState(shrineState.water ?? {});
     populateMeritNamesCarousel(shrineState.offering_names ?? []);
     updateLivePractitioners(shrineState.live_practitioners ?? 0);
+    updateMantraTotal(shrineState.mantra_total ?? 0);
+    renderDedication(shrineState.dedication_names ?? []);
 }
 
 function escapeHtml(text) {
@@ -245,9 +295,20 @@ function renderMusicOfferings(musicState) {
         return;
     }
 
-    container.replaceChildren();
+    const active = musicState?.active ?? [];
+    const activeIds = new Set(active.map((offering) => String(offering.id)));
 
-    (musicState?.active ?? []).forEach((offering) => {
+    container.querySelectorAll('.music-player').forEach((player) => {
+        if (!activeIds.has(player.dataset.offeringId ?? '')) {
+            player.remove();
+        }
+    });
+
+    active.forEach((offering) => {
+        if (container.querySelector(`[data-offering-id="${offering.id}"]`)) {
+            return;
+        }
+
         container.appendChild(createMusicPlayerElement(offering));
     });
 }
@@ -373,23 +434,24 @@ async function selectMusicTrack(track, cardEl) {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({ track_id: track.id, name }),
+            body: JSON.stringify(offeringPayload({ track_id: track.id, name })),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            throw new Error('Music offering failed');
+            throw new Error(offeringErrorMessage(data, 'Music offering failed'));
         }
 
-        const data = await response.json();
-        shrineState = data.shrine_state ?? shrineState;
+        mergeShrineState(data.shrine_state);
         renderMusicOfferings(shrineState.music);
         populateMeritNamesCarousel(shrineState.offering_names ?? []);
 
         if (nameInput) {
             nameInput.value = '';
         }
-    } catch {
-        alert('Unable to offer this music. Please try again.');
+    } catch (error) {
+        alert(error.message ?? 'Unable to offer this music. Please try again.');
     } finally {
         isSelectingMusic = false;
         document.querySelectorAll('.music-track-card').forEach((card) => {
@@ -419,16 +481,16 @@ async function submitMusicSuggestion() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({
+            body: JSON.stringify(offeringPayload({
                 url,
                 name: nameInput?.value.trim() || null,
-            }),
+            })),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.message ?? 'Suggestion failed');
+            throw new Error(offeringErrorMessage(data, 'Suggestion failed'));
         }
 
         if (urlInput) {
@@ -448,10 +510,10 @@ async function submitMusicSuggestion() {
 
 function incenseStickCount(incense) {
     if (typeof incense === 'object' && incense !== null && typeof incense.sticks === 'number') {
-        return Math.max(1, incense.sticks);
+        return Math.max(2, incense.sticks);
     }
 
-    return 1;
+    return 2;
 }
 
 function getCloudTargetMax() {
@@ -497,7 +559,7 @@ function distributeIncenseSticks(totalSticks, holderCount) {
 
 function ensureIncenseHolderElements(holderCount) {
     const extraContainer = document.getElementById(INCENSE_SHRINE_EXTRA_ID);
-    const primary = [...document.querySelectorAll('.deity-title-row .incense-shrine')];
+    const primary = [...document.querySelectorAll('.altar-incense-flank .incense-shrine')];
     const extrasNeeded = Math.max(0, holderCount - primary.length);
     const extras = extraContainer ? [...extraContainer.querySelectorAll('.incense-shrine')] : [];
 
@@ -527,7 +589,13 @@ function renderIncenseShrines(sticks) {
     const holders = ensureIncenseHolderElements(holderCount);
 
     holders.forEach((shrine, index) => {
-        const count = distribution[index] ?? 0;
+        const isFlank = shrine.classList.contains('incense-shrine--flank');
+        let count = distribution[index] ?? 0;
+
+        if (isFlank && count < 1) {
+            count = 1;
+        }
+
         shrine.dataset.incenseSticks = String(count);
 
         if (count > 0) {
@@ -538,8 +606,10 @@ function renderIncenseShrines(sticks) {
         }
 
         shrine.innerHTML = incenseSvg({ lit: false, sticks: 0 });
-        shrine.classList.toggle('hidden', index >= 2);
-        shrine.toggleAttribute('hidden', index >= 2);
+        if (!isFlank) {
+            shrine.classList.add('hidden');
+            shrine.setAttribute('hidden', '');
+        }
     });
 }
 
@@ -566,6 +636,46 @@ function getIncenseShrines() {
     );
 }
 
+function getOfferedButterLamps() {
+    return [...document.querySelectorAll('#offered-lamps .butter-lamp[data-lamp-id]')];
+}
+
+function getOfferingNameTargets() {
+    return [...document.querySelectorAll(OFFERING_NAME_SELECTOR)].filter((element) => {
+        if ((element.textContent?.trim() ?? '') === '') {
+            return false;
+        }
+
+        return isVisibleInViewport(element);
+    });
+}
+
+function isVisibleInViewport(element) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) {
+        return false;
+    }
+
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    return (
+        centerX >= 0
+        && centerY >= 0
+        && centerX <= window.innerWidth
+        && centerY <= window.innerHeight
+    );
+}
+
+function getOfferingNamePoint(target) {
+    const rect = target.getBoundingClientRect();
+
+    return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+    };
+}
+
 function getCloudSpawnX() {
     const sources = getIncenseShrines();
     let baseX = window.innerWidth / 2;
@@ -582,14 +692,20 @@ function getCloudSpawnX() {
 
 function spawnCloudSyllable(position = null) {
     const container = document.getElementById(SYLLABLE_SMOKE_ID);
-    const sources = getIncenseShrines();
-    if (!container || !sources.length) {
+    if (!container) {
         return;
     }
 
-    const current = container.querySelectorAll('.syllable-particle--cloud').length;
-    if (current >= getCloudTargetNow()) {
-        return;
+    if (!position) {
+        const sources = getIncenseShrines();
+        if (!sources.length) {
+            return;
+        }
+
+        const current = container.querySelectorAll('.syllable-particle--cloud').length;
+        if (current >= getCloudTargetNow()) {
+            return;
+        }
     }
 
     const syllable = SYLLABLES[Math.floor(Math.random() * SYLLABLES.length)];
@@ -608,11 +724,183 @@ function spawnCloudSyllable(position = null) {
     particle.style.setProperty('--drift-y', `${(Math.random() - 0.5) * 28}px`);
     particle.style.setProperty('--sway-x', `${(Math.random() - 0.5) * 36}px`);
     particle.style.setProperty('--peak-opacity', `${0.38 + Math.random() * 0.42}`);
-    particle.style.setProperty('--cloud-duration', `${16 + Math.random() * 14}s`);
+    const durationSec = 16 + Math.random() * 14;
+    particle.style.setProperty('--cloud-duration', `${durationSec}s`);
     particle.style.fontSize = `${0.52 + Math.random() * 0.38}rem`;
 
     container.appendChild(particle);
-    particle.addEventListener('animationend', () => particle.remove());
+
+    let finished = false;
+    const finish = () => {
+        if (finished) {
+            return;
+        }
+
+        finished = true;
+        particle.remove();
+    };
+
+    particle.addEventListener('animationend', (event) => {
+        if (event.animationName === 'syllable-cloud' || event.animationName === 'syllable-hover-dissolve') {
+            finish();
+        }
+    });
+
+    scheduleCloudSyllableDescent(particle, durationSec);
+}
+
+function scheduleCloudSyllableDescent(particle, durationSec) {
+    if (!getOfferingNameTargets().length) {
+        return;
+    }
+
+    window.setTimeout(() => {
+        if (!particle.isConnected || particle.dataset.descending === '1') {
+            return;
+        }
+
+        beginCloudSyllableDescent(particle);
+    }, durationSec * 1000 * CLOUD_DISSOLVE_AT);
+}
+
+function beginCloudSyllableDescent(particle) {
+    const targets = getOfferingNameTargets();
+    if (!targets.length || particle.dataset.descending === '1') {
+        return;
+    }
+
+    const target = targets[Math.floor(Math.random() * targets.length)];
+    const end = getOfferingNamePoint(target);
+    const particleRect = particle.getBoundingClientRect();
+    const startX = particleRect.left + particleRect.width / 2;
+    const startY = particleRect.top + particleRect.height / 2;
+
+    if (!Number.isFinite(end.x) || !Number.isFinite(end.y) || (end.x === 0 && end.y === 0)) {
+        return;
+    }
+
+    particle.dataset.descending = '1';
+    particle.classList.remove('syllable-particle--cloud');
+    particle.classList.add('syllable-particle--descending');
+    particle.style.left = `${startX}px`;
+    particle.style.top = `${startY}px`;
+
+    const deltaX = end.x - startX;
+    const deltaY = end.y - startY;
+    const arcSpread = Math.min(160, Math.abs(deltaX) * 0.55 + 48);
+    const arcBias = (Math.random() - 0.5) * arcSpread;
+    const midX = deltaX * 0.42 + arcBias;
+
+    particle.style.setProperty('--descend-x', `${deltaX}px`);
+    particle.style.setProperty('--descend-y', `${deltaY}px`);
+    particle.style.setProperty('--descend-sway-x', `${midX}px`);
+    particle.style.setProperty('--descend-mid-x', `${deltaX * 0.82 + midX * 0.2}px`);
+    particle.style.setProperty('--descend-mid-y', `${deltaY * 0.78}px`);
+    particle.style.setProperty('--descend-duration', `${3.4 + Math.random() * 2.2}s`);
+    particle.style.animation = 'none';
+    void particle.offsetWidth;
+    particle.style.removeProperty('animation');
+
+    particle.addEventListener('animationend', function onDescendEnd(event) {
+        if (event.animationName !== 'syllable-descend') {
+            return;
+        }
+
+        particle.removeEventListener('animationend', onDescendEnd);
+        beginSyllableHoverDissolve(particle, target);
+    });
+}
+
+function beginSyllableHoverDissolve(particle, target) {
+    if (!particle.isConnected || !target?.isConnected || !isVisibleInViewport(target)) {
+        particle.remove();
+        return;
+    }
+
+    const { x, y } = getOfferingNamePoint(target);
+
+    particle.classList.remove('syllable-particle--descending');
+    particle.classList.add('syllable-particle--hovering');
+    particle.style.left = `${x}px`;
+    particle.style.top = `${y}px`;
+    particle.style.setProperty('--hover-duration', `${2.8 + Math.random() * 1.6}s`);
+    particle.style.animation = 'none';
+    void particle.offsetWidth;
+    particle.style.removeProperty('animation');
+}
+
+function spawnLampRaySyllable() {
+    const container = document.getElementById(SYLLABLE_SMOKE_ID);
+    const lamps = getOfferedButterLamps();
+    if (!container || !lamps.length) {
+        return;
+    }
+
+    const lamp = lamps[Math.floor(Math.random() * lamps.length)];
+    const rect = lamp.getBoundingClientRect();
+    const syllable = SYLLABLES[Math.floor(Math.random() * SYLLABLES.length)];
+    const particle = document.createElement('span');
+    particle.className = `syllable-particle syllable-particle--lamp-ray ${syllable.className}`;
+    particle.textContent = syllable.text;
+
+    const originX = rect.left + rect.width / 2;
+    const originY = rect.top + rect.height * 0.12;
+    const angleFromUp = (Math.random() * 120 - 60) * (Math.PI / 180);
+    const outwardDist = 36 + Math.random() * 88;
+    const riseDist = window.innerHeight * (0.06 + Math.random() * 0.26);
+    const rayX = Math.sin(angleFromUp) * outwardDist;
+    const rayY = -Math.abs(Math.cos(angleFromUp) * outwardDist) - riseDist;
+
+    particle.style.left = `${originX}px`;
+    particle.style.top = `${originY}px`;
+    particle.style.setProperty('--ray-x', `${rayX}px`);
+    particle.style.setProperty('--ray-y', `${rayY}px`);
+    particle.style.setProperty('--ray-duration', `${4.2 + Math.random() * 3.8}s`);
+    particle.style.fontSize = `${0.42 + Math.random() * 0.26}rem`;
+
+    container.appendChild(particle);
+    particle.addEventListener('animationend', () => {
+        const finalRect = particle.getBoundingClientRect();
+        const cloudMinY = window.innerHeight * CLOUD_BAND_TOP;
+        const cloudMaxY = window.innerHeight * (CLOUD_BAND_TOP + CLOUD_BAND_HEIGHT);
+        const centerY = finalRect.top + finalRect.height / 2;
+
+        if (centerY >= cloudMinY - 24 && centerY <= cloudMaxY + 48) {
+            depositCloudFromRiser(particle);
+        }
+
+        particle.remove();
+    }, { once: true });
+}
+
+function getLampRayIntervalMs() {
+    const count = getOfferedButterLamps().length;
+    if (!count) {
+        return null;
+    }
+
+    return Math.max(LAMP_RAY_INTERVAL_MIN, LAMP_RAY_INTERVAL_BASE - count * LAMP_RAY_INTERVAL_PER_LAMP);
+}
+
+function maintainLampRaySyllables() {
+    if (getOfferedButterLamps().length) {
+        spawnLampRaySyllable();
+    }
+}
+
+function startLampRayInterval() {
+    if (syllableLampRayInterval) {
+        clearInterval(syllableLampRayInterval);
+        syllableLampRayInterval = null;
+    }
+
+    const intervalMs = getLampRayIntervalMs();
+    if (!intervalMs) {
+        return;
+    }
+
+    syllableLampRayInterval = window.setInterval(maintainLampRaySyllables, intervalMs);
+    spawnLampRaySyllable();
 }
 
 function depositCloudFromRiser(particle) {
@@ -712,13 +1000,7 @@ function updateLivePractitioners(count) {
 }
 
 function getPractitionerToken() {
-    let token = sessionStorage.getItem(PRACTITIONER_TOKEN_KEY);
-    if (!token) {
-        token = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        sessionStorage.setItem(PRACTITIONER_TOKEN_KEY, token);
-    }
-
-    return token;
+    return getVisitorToken();
 }
 
 async function sendPractitionerHeartbeat() {
@@ -779,30 +1061,62 @@ function seedOfferedLamps() {
     }));
 }
 
-function renderFlowers(flowers) {
+function syncFlowers(flowers) {
     const container = document.getElementById(OFFERED_FLOWERS_ID);
     if (!container) {
         return;
     }
 
-    container.replaceChildren();
+    const ids = new Set(flowers.map((flower) => String(flower.id)));
+
+    container.querySelectorAll('[data-flower-id]').forEach((element) => {
+        if (!ids.has(element.dataset.flowerId ?? '')) {
+            element.remove();
+        }
+    });
+
     flowers.forEach((flower) => {
+        if (container.querySelector(`[data-flower-id="${flower.id}"]`)) {
+            return;
+        }
+
         container.appendChild(
-            createFlowerElement(flower.name, flower.id, flower.flower_type, flower.vase_color),
+            createFlowerElement(flower.name, flower.id, flower.flower_type, flower.vase_color, false),
         );
     });
 }
 
-function renderLamps(lamps) {
+function syncLamps(lamps) {
     const container = document.getElementById(OFFERED_LAMPS_ID);
     if (!container) {
         return;
     }
 
-    container.replaceChildren();
-    lamps.forEach((lamp) => {
-        container.appendChild(createLampElement(lamp.name, lamp.id, true));
+    const ids = new Set(lamps.map((lamp) => String(lamp.id)));
+
+    container.querySelectorAll('[data-lamp-id]').forEach((element) => {
+        if (!ids.has(element.dataset.lampId ?? '')) {
+            element.remove();
+        }
     });
+
+    lamps.forEach((lamp) => {
+        if (container.querySelector(`[data-lamp-id="${lamp.id}"]`)) {
+            return;
+        }
+
+        container.appendChild(createLampElement(lamp.name, lamp.id, false));
+    });
+
+    startLampRayInterval();
+}
+
+function renderFlowers(flowers) {
+    syncFlowers(flowers);
+}
+
+function renderLamps(lamps) {
+    syncLamps(lamps);
 }
 
 function refreshFlowerPreview() {
@@ -827,9 +1141,9 @@ function hydrateFlowerVases() {
     });
 }
 
-function createFlowerElement(name, id = null, flowerType = null, vaseColor = null) {
+function createFlowerElement(name, id = null, flowerType = null, vaseColor = null, animate = true) {
     const flower = document.createElement('div');
-    flower.className = 'flower-vase offered-flower';
+    flower.className = `flower-vase${animate ? ' offered-flower' : ''}`;
     const type = flowerType || randomFlowerType();
     const color = vaseColor || (id ? vaseColorForId(id) : randomVaseColor());
     flower.dataset.flowerType = type;
@@ -869,62 +1183,141 @@ function createLampElement(name, id = null, animate = true) {
     return lamp;
 }
 
-function applyWaterState(water) {
-    const stack = document.getElementById(WATER_STACK_ID);
-    const active = document.getElementById(WATER_ACTIVE_ID);
-    const status = document.getElementById(WATER_STATUS_ID);
-    const beginBtn = document.getElementById(BTN_BEGIN_WATER_ID);
+function syncShrineWaterBowls(water) {
+    const positions = water.display_positions ?? [];
+    const name = water.display_name ?? null;
     const display = document.getElementById(OFFERED_WATER_ID);
+    const nameEl = document.getElementById(WATER_SHRINE_NAME_ID);
 
-    const session = water.session;
-    const isOwner = session && waterToken && session.token === waterToken;
-    const inProgress = water.active && session && !session.completed_at;
+    display?.querySelectorAll('.water-bowl-shrine').forEach((bowl) => {
+        const pos = Number.parseInt(bowl.dataset.position ?? '0', 10);
+        bowl.innerHTML = waterBowlSvg({ filled: positions.includes(pos) });
+    });
 
-    if (display) {
-        const positions = water.display_positions ?? [];
-        const bowls = display.querySelectorAll('.water-bowl-filled');
-        if (positions.length >= 7) {
-            display.classList.remove('hidden');
-            bowls.forEach((bowl) => {
-                const pos = Number.parseInt(bowl.dataset.position ?? '0', 10);
-                bowl.hidden = !positions.includes(pos);
-            });
+    if (nameEl) {
+        if (name) {
+            nameEl.textContent = name;
+            nameEl.classList.remove('hidden');
+            nameEl.removeAttribute('aria-hidden');
         } else {
-            display.classList.add('hidden');
-        }
-    }
-
-    if (inProgress && isOwner) {
-        stack?.classList.add('hidden');
-        active?.classList.remove('hidden');
-        beginBtn?.setAttribute('disabled', 'disabled');
-        status.textContent = `Fill each bowl (${session.filled_positions.length}/7)`;
-        syncActiveBowls(session.filled_positions ?? []);
-    } else if (inProgress && water.locked_by_other) {
-        stack?.classList.remove('hidden');
-        active?.classList.add('hidden');
-        beginBtn?.setAttribute('disabled', 'disabled');
-        status.textContent = 'Someone is currently offering water.';
-    } else {
-        stack?.classList.remove('hidden');
-        active?.classList.add('hidden');
-        beginBtn?.removeAttribute('disabled');
-        status.textContent = 'Seven bowls — one offering at a time';
-        if (!inProgress) {
-            waterToken = null;
-            sessionStorage.removeItem(WATER_TOKEN_KEY);
+            nameEl.textContent = '';
+            nameEl.classList.add('hidden');
+            nameEl.setAttribute('aria-hidden', 'true');
         }
     }
 }
 
-function syncActiveBowls(filledPositions) {
-    document.querySelectorAll('.water-bowl-offer').forEach((btn) => {
-        const pos = Number.parseInt(btn.dataset.position ?? '0', 10);
-        const filled = filledPositions.includes(pos);
-        btn.classList.toggle('filled', filled);
-        btn.disabled = filled;
-        btn.innerHTML = waterBowlSvg({ filled });
+function applyWaterState(water) {
+    syncShrineWaterBowls(water ?? {});
+}
+
+function animateWaterBowlFlight(sourceEl, targetEl, delayMs) {
+    return new Promise((resolve) => {
+        window.setTimeout(() => {
+            const sourceRect = sourceEl.getBoundingClientRect();
+            const targetRect = targetEl.getBoundingClientRect();
+            const flying = document.createElement('div');
+            flying.className = 'flying-water-bowl';
+            flying.innerHTML = waterBowlSvg({ filled: true });
+
+            const startX = sourceRect.left + sourceRect.width / 2;
+            const startY = sourceRect.top + sourceRect.height / 2;
+            const endX = targetRect.left + targetRect.width / 2;
+            const endY = targetRect.top + targetRect.height / 2;
+            const lateral = (Math.random() - 0.5) * 44;
+
+            flying.style.left = `${startX}px`;
+            flying.style.top = `${startY}px`;
+            document.body.appendChild(flying);
+
+            const duration = 1600;
+            const startTime = performance.now();
+
+            const animate = (now) => {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 2.2);
+                const x = startX + (endX - startX) * eased + Math.sin(progress * Math.PI) * lateral;
+                const y = startY + (endY - startY) * eased - Math.sin(progress * Math.PI) * 40;
+                const opacity = progress < 0.86 ? 1 : 1 - ((progress - 0.86) / 0.14);
+
+                flying.style.left = `${x}px`;
+                flying.style.top = `${y}px`;
+                flying.style.opacity = String(opacity);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                targetEl.innerHTML = waterBowlSvg({ filled: true });
+                flying.remove();
+                resolve();
+            };
+
+            requestAnimationFrame(animate);
+        }, delayMs);
     });
+}
+
+async function animateWaterBowlsToShrine() {
+    const previewBowls = [...document.querySelectorAll('#water-offering-preview .water-bowl-preview')];
+    const shrineBowls = [...document.querySelectorAll('#offered-water-bowls .water-bowl-shrine')];
+
+    if (!previewBowls.length || !shrineBowls.length) {
+        return;
+    }
+
+    await Promise.all(
+        previewBowls.map((previewBowl, index) => {
+            const position = Number.parseInt(previewBowl.dataset.position ?? String(index + 1), 10);
+            const shrineBowl =
+                shrineBowls.find((bowl) => Number.parseInt(bowl.dataset.position ?? '0', 10) === position)
+                ?? shrineBowls[index];
+
+            return animateWaterBowlFlight(previewBowl, shrineBowl, index * 130);
+        }),
+    );
+}
+
+async function offerWater() {
+    const btn = document.getElementById(BTN_OFFER_WATER_ID);
+    const nameInput = document.getElementById(WATER_NAME_ID);
+    btn?.setAttribute('disabled', 'disabled');
+    const name = nameInput?.value.trim() ?? '';
+
+    try {
+        const response = await fetch('/water-offerings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify(offeringPayload({ name: name || null })),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(offeringErrorMessage(data, 'Water offering failed'));
+        }
+
+        await animateWaterBowlsToShrine();
+
+        mergeShrineState(data.shrine_state);
+        applyShrineState();
+        if (Array.isArray(data.offering_names)) {
+            shrineState.offering_names = data.offering_names;
+            populateMeritNamesCarousel(data.offering_names);
+        }
+        if (nameInput) {
+            nameInput.value = '';
+        }
+    } catch (error) {
+        alert(error.message ?? 'Unable to offer water. Please try again.');
+    } finally {
+        btn?.removeAttribute('disabled');
+    }
 }
 
 function initOfferingGraphics() {
@@ -954,16 +1347,8 @@ function initOfferingGraphics() {
         musicPreview.innerHTML = dranyenSvg();
     }
 
-    document.querySelectorAll('.water-bowl-stacked').forEach((bowl) => {
+    document.querySelectorAll('.water-bowl-preview').forEach((bowl) => {
         bowl.innerHTML = waterBowlSvg({ filled: false });
-    });
-
-    document.querySelectorAll('.water-bowl-offer').forEach((btn) => {
-        btn.innerHTML = waterBowlSvg({ filled: btn.classList.contains('filled') });
-    });
-
-    document.querySelectorAll('.water-bowl-filled').forEach((bowl) => {
-        bowl.innerHTML = waterBowlSvg({ filled: true });
     });
 
     document.querySelectorAll('#offered-lamps .butter-lamp').forEach((lamp) => {
@@ -973,32 +1358,6 @@ function initOfferingGraphics() {
             lamp.appendChild(label);
         }
     });
-
-    const pitcher = document.getElementById(WATER_PITCHER_ID);
-    if (pitcher) {
-        pitcher.innerHTML = `${waterPitcherSvg()}<div class="pitcher-stream"></div>`;
-    }
-}
-
-async function animatePitcherPour(targetButton) {
-    const pitcher = document.getElementById(WATER_PITCHER_ID);
-    if (!pitcher || !targetButton) {
-        return;
-    }
-
-    const targetRect = targetButton.getBoundingClientRect();
-    pitcher.classList.remove('hidden');
-    pitcher.style.left = `${targetRect.left + targetRect.width / 2 - 16}px`;
-    pitcher.style.top = `${targetRect.top - 80}px`;
-    pitcher.style.opacity = '1';
-
-    const stream = pitcher.querySelector('.pitcher-stream');
-    stream?.style.removeProperty('animation');
-    void stream?.offsetWidth;
-    stream?.style.setProperty('animation', 'pour-stream 0.9s ease-in forwards');
-
-    await new Promise((resolve) => setTimeout(resolve, 950));
-    pitcher.classList.add('hidden');
 }
 
 function lightLamp() {
@@ -1234,14 +1593,14 @@ async function offerLamp() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({ name: name || null }),
+            body: JSON.stringify({ name: name || null, ...offeringPayload() }),
         });
 
-        if (!response.ok) {
-            throw new Error('Offering failed');
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(offeringErrorMessage(data, 'Offering failed'));
+        }
         const savedName = data.lamp?.name ?? null;
         const offeredContainer = document.getElementById(OFFERED_LAMPS_ID);
         const landing = offeringRowLandingPoint(offeredContainer);
@@ -1283,8 +1642,8 @@ async function offerLamp() {
         }
 
         if (data.lamp?.id) {
-            offeredLamps.unshift({ id: data.lamp.id, name: savedName });
-            renderLamps(offeredLamps);
+            mergeShrineState(data.shrine_state);
+            applyShrineState();
         }
 
         document.getElementById(OFFERING_FLAME_ID)?.classList.remove('lit');
@@ -1302,8 +1661,8 @@ async function offerLamp() {
 
         isLit = false;
         closeLampOfferingModal(true);
-    } catch {
-        alert('Unable to place your offering. Please try again.');
+    } catch (error) {
+        alert(error.message ?? 'Unable to place your offering. Please try again.');
     } finally {
         isOffering = false;
         offerBtn?.removeAttribute('disabled');
@@ -1335,23 +1694,23 @@ async function addMantraRepetitions() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({ count }),
+            body: JSON.stringify(offeringPayload({ count })),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            throw new Error('Mantra offering failed');
+            throw new Error(offeringErrorMessage(data, 'Mantra offering failed'));
         }
 
-        const data = await response.json();
-        const totalEl = document.getElementById(MANTRA_TOTAL_ID);
-        if (totalEl && typeof data.total_count === 'number') {
-            totalEl.textContent = formatCount(data.total_count);
-        }
+        mergeShrineState(data.shrine_state);
+        updateMantraTotal(data.total_count ?? shrineState.mantra_total ?? 0);
         if (Array.isArray(data.dedication_names)) {
             renderDedication(data.dedication_names);
         }
-    } catch {
-        alert('Unable to add your repetitions. Please try again.');
+        applyShrineState();
+    } catch (error) {
+        alert(error.message ?? 'Unable to add your repetitions. Please try again.');
     } finally {
         isAddingMantra = false;
         addBtn?.removeAttribute('disabled');
@@ -1371,21 +1730,22 @@ async function offerIncense() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({ name: nameInput?.value.trim() || null }),
+            body: JSON.stringify(offeringPayload({ name: nameInput?.value.trim() || null })),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            throw new Error('Incense offering failed');
+            throw new Error(offeringErrorMessage(data, 'Incense offering failed'));
         }
 
-        const data = await response.json();
-        shrineState = data.shrine_state ?? shrineState;
+        mergeShrineState(data.shrine_state);
         applyShrineState();
         if (nameInput) {
             nameInput.value = '';
         }
-    } catch {
-        alert('Unable to offer incense. Please try again.');
+    } catch (error) {
+        alert(error.message ?? 'Unable to offer incense. Please try again.');
     } finally {
         btn?.removeAttribute('disabled');
     }
@@ -1407,14 +1767,15 @@ async function offerFlower() {
                 Accept: 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
             },
-            body: JSON.stringify({ name: name || null }),
+            body: JSON.stringify(offeringPayload({ name: name || null })),
         });
 
+        const data = await response.json();
+
         if (!response.ok) {
-            throw new Error('Flower offering failed');
+            throw new Error(offeringErrorMessage(data, 'Flower offering failed'));
         }
 
-        const data = await response.json();
         const offering = data.offering;
         const flowerContainer = document.getElementById(OFFERED_FLOWERS_ID);
         const landing = offeringRowLandingPoint(flowerContainer);
@@ -1454,114 +1815,26 @@ async function offerFlower() {
             });
         }
 
-        shrineState = data.shrine_state ?? shrineState;
-        renderFlowers(shrineState.flowers ?? []);
-        populateMeritNamesCarousel(shrineState.offering_names ?? []);
+        mergeShrineState(data.shrine_state);
+        applyShrineState();
         if (nameInput) {
             nameInput.value = '';
         }
         refreshFlowerPreview();
-    } catch {
-        alert('Unable to offer flowers. Please try again.');
+    } catch (error) {
+        alert(error.message ?? 'Unable to offer flowers. Please try again.');
     } finally {
         btn?.removeAttribute('disabled');
     }
 }
 
-async function beginWaterOffering() {
-    const btn = document.getElementById(BTN_BEGIN_WATER_ID);
-    btn?.setAttribute('disabled', 'disabled');
-
-    try {
-        const response = await fetch('/water-bowls/acquire', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-            body: JSON.stringify({ token: waterToken }),
-        });
-
-        const data = await response.json();
-
-        if (response.status === 423) {
-            shrineState = data.shrine_state ?? shrineState;
-            applyShrineState();
-            startStatePolling();
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error('Could not begin water offering');
-        }
-
-        waterToken = data.session?.token ?? null;
-        if (waterToken) {
-            sessionStorage.setItem(WATER_TOKEN_KEY, waterToken);
-        }
-
-        shrineState = data.shrine_state ?? shrineState;
-        applyShrineState();
-    } catch {
-        alert('Unable to begin water offering. Please try again.');
-        btn?.removeAttribute('disabled');
-    }
-}
-
-async function fillWaterBowl(position, button) {
-    if (!waterToken || button.classList.contains('filled')) {
-        return;
-    }
-
-    button.disabled = true;
-
-    try {
-        await animatePitcherPour(button);
-
-        const response = await fetch('/water-bowls/fill', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-            },
-            body: JSON.stringify({ token: waterToken, position }),
-        });
-
-        const data = await response.json();
-
-        if (response.status === 410) {
-            waterToken = null;
-            sessionStorage.removeItem(WATER_TOKEN_KEY);
-            shrineState = data.shrine_state ?? shrineState;
-            applyShrineState();
-            alert('Your water offering session expired.');
-            return;
-        }
-
-        if (!response.ok) {
-            throw new Error(data.message ?? 'Could not fill bowl');
-        }
-
-        button.classList.add('filled');
-        shrineState = data.shrine_state ?? shrineState;
-        applyShrineState();
-
-        if (data.session?.completed_at) {
-            waterToken = null;
-            sessionStorage.removeItem(WATER_TOKEN_KEY);
-            stopStatePolling();
-        }
-    } catch {
-        button.disabled = false;
-        alert('Unable to fill this bowl. Please try again.');
-    }
-}
-
 async function refreshShrineState() {
     try {
-        const response = await fetch('/offerings/state', {
+        const params = new URLSearchParams({
+            visitor_token: getVisitorToken(),
+        });
+
+        const response = await fetch(`/offerings/state?${params.toString()}`, {
             headers: { Accept: 'application/json' },
         });
 
@@ -1569,30 +1842,28 @@ async function refreshShrineState() {
             return;
         }
 
-        shrineState = await response.json();
+        mergeShrineState(await response.json());
         applyShrineState();
-
-        if (!shrineState.water?.active || shrineState.water?.session?.token === waterToken) {
-            stopStatePolling();
-        }
     } catch {
         // ignore polling errors
     }
 }
 
-function startStatePolling() {
-    if (statePollInterval) {
+function startShrinePolling() {
+    if (shrinePollInterval) {
         return;
     }
 
-    statePollInterval = window.setInterval(refreshShrineState, 3000);
+    refreshShrineState();
+    shrinePollInterval = window.setInterval(refreshShrineState, SHRINE_POLL_MS);
+}
+
+function startStatePolling() {
+    startShrinePolling();
 }
 
 function stopStatePolling() {
-    if (statePollInterval) {
-        clearInterval(statePollInterval);
-        statePollInterval = null;
-    }
+    // Shrine polling stays active for all visitors.
 }
 
 document.getElementById(BTN_LIGHT_ID)?.addEventListener('click', lightLamp);
@@ -1606,7 +1877,7 @@ document.getElementById(BTN_OPEN_SUTRA_ID)?.addEventListener('click', openSutraM
 document.getElementById(BTN_CLOSE_SUTRA_ID)?.addEventListener('click', closeSutraModal);
 document.getElementById(BTN_OFFER_INCENSE_ID)?.addEventListener('click', offerIncense);
 document.getElementById(BTN_OFFER_FLOWER_ID)?.addEventListener('click', offerFlower);
-document.getElementById(BTN_BEGIN_WATER_ID)?.addEventListener('click', beginWaterOffering);
+document.getElementById(BTN_OFFER_WATER_ID)?.addEventListener('click', offerWater);
 document.getElementById(BTN_OFFER_MUSIC_ID)?.addEventListener('click', openMusicModal);
 document.getElementById(BTN_CLOSE_MUSIC_MODAL_ID)?.addEventListener('click', closeMusicModal);
 document.getElementById(BTN_SUBMIT_MUSIC_SUGGESTION_ID)?.addEventListener('click', submitMusicSuggestion);
@@ -1628,13 +1899,6 @@ document.getElementById(BTN_OPEN_DEDICATION_ID)?.addEventListener('click', openD
 document.getElementById(BTN_CLOSE_DEDICATION_ID)?.addEventListener('click', closeDedicationModal);
 document.querySelectorAll('[data-close-dedication]').forEach((element) => {
     element.addEventListener('click', closeDedicationModal);
-});
-
-document.querySelectorAll('.water-bowl-offer').forEach((button) => {
-    button.addEventListener('click', () => {
-        const position = Number.parseInt(button.dataset.position ?? '0', 10);
-        fillWaterBowl(position, button);
-    });
 });
 
 document.addEventListener('keydown', (event) => {
@@ -1691,10 +1955,6 @@ loadInitialState();
 initOfferingGraphics();
 updateIncenseDisplay(shrineState.incense);
 startPractitionerPresence();
+startShrinePolling();
+startLampRayInterval();
 initFirstVisitPrompts();
-
-if (waterToken) {
-    beginWaterOffering();
-} else if (shrineState.water?.locked_by_other) {
-    startStatePolling();
-}
