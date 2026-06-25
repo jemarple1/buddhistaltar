@@ -379,20 +379,13 @@
     .offerings-grid {
         display: grid;
         gap: 1rem;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
     }
 
-    @media (max-width: 767px) {
+    @media (min-width: 768px) {
         .offerings-grid {
-            grid-template-columns: repeat(4, minmax(10.5rem, 1fr));
-            overflow-x: auto;
-            padding-bottom: 0.5rem;
-            scroll-snap-type: x proximity;
-        }
-
-        .offering-column {
-            scroll-snap-align: start;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
     }
 
@@ -725,22 +718,6 @@
         z-index: 100;
         pointer-events: none;
         transition: none;
-    }
-
-    .offerings-row--music {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-    }
-
-    .offering-column--music {
-        width: min(100%, 16rem);
-    }
-
-    .music-preview-icon {
-        width: 4.5rem;
-        height: 4.5rem;
-        filter: drop-shadow(0 4px 10px rgba(12, 74, 110, 0.18));
     }
 
     .offering-svg--dranyen {

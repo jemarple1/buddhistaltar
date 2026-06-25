@@ -195,10 +195,9 @@
                             </div>
                             <button type="button" id="btn-light" class="btn-shrine mt-4 w-full rounded px-4 py-2.5 text-sm tracking-wide">Light</button>
                         </div>
-                    </div>
 
-                    <div class="offerings-row offerings-row--music mt-4">
-                        <div class="offering-column offering-column--music">
+                        {{-- Music --}}
+                        <div class="offering-column">
                             <h3 class="offering-column-title">Music</h3>
                             <p class="offering-column-desc">Offer sacred music before the shrine</p>
                             <div class="offering-preview music-preview">
