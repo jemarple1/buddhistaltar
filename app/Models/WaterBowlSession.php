@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class WaterBowlSession extends Model
 {
     protected $fillable = [
+        'shrine',
         'token',
         'visitor_token',
         'name',

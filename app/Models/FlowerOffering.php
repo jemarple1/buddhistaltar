@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class FlowerOffering extends Model
 {
     protected $fillable = [
+        'shrine',
         'name',
         'visitor_token',
         'flower_type',

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ButterLamp extends Model
 {
     protected $fillable = [
+        'shrine',
         'name',
         'visitor_token',
         'expires_at',

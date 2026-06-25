@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class MantraRepetition extends Model
 {
     protected $fillable = [
+        'shrine',
         'count',
         'visitor_token',
     ];

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class MusicOffering extends Model
 {
     protected $fillable = [
+        'shrine',
         'music_track_id',
         'name',
         'visitor_token',

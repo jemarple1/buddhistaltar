@@ -105,10 +105,16 @@ class OfferingGuard
     /**
      * @param  class-string<Model>  $modelClass
      */
-    public static function assertWithinLimit(string $visitorToken, string $modelClass, string $label): void
-    {
+    public static function assertWithinLimit(
+        string $visitorToken,
+        string $modelClass,
+        string $label,
+        string $shrine = 'avalokiteshvara',
+    ): void {
         $count = self::applyActiveScope(
-            $modelClass::query()->where('visitor_token', $visitorToken),
+            $modelClass::query()
+                ->where('shrine', $shrine)
+                ->where('visitor_token', $visitorToken),
             $modelClass,
         )->count();
 
@@ -123,13 +129,15 @@ class OfferingGuard
      * @param  array<string, class-string<Model>>  $models
      * @return array<string, array{used: int, remaining: int, max: int}>
      */
-    public static function limitsFor(string $visitorToken, array $models): array
+    public static function limitsFor(string $visitorToken, array $models, string $shrine = 'avalokiteshvara'): array
     {
         $limits = [];
 
         foreach ($models as $key => $modelClass) {
             $used = self::applyActiveScope(
-                $modelClass::query()->where('visitor_token', $visitorToken),
+                $modelClass::query()
+                    ->where('shrine', $shrine)
+                    ->where('visitor_token', $visitorToken),
                 $modelClass,
             )->count();
 

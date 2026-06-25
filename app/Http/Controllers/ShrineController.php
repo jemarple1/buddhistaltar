@@ -12,10 +12,12 @@ use App\Models\MusicTrack;
 use App\Models\PractitionerPresence;
 use App\Models\WaterBowlSession;
 use App\Support\OfferingGuard;
+use App\Support\ShrineRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ShrineController extends Controller
@@ -37,8 +39,13 @@ class ShrineController extends Controller
         'music_suggestions' => MusicSuggestion::class,
     ];
 
-    public function index(): View
+    private string $shrineSlug = 'avalokiteshvara';
+
+    public function index(Request $request): View
     {
+        $this->resolveShrine($request);
+        $shrine = ShrineRegistry::config($this->shrineSlug);
+
         $lamps = $this->activeOfferingQuery(ButterLamp::class)
             ->latest()
             ->limit(200)
@@ -56,11 +63,12 @@ class ShrineController extends Controller
 
         $offeringNames = $this->offeringNames();
 
-        $totalMantraCount = (int) MantraRepetition::query()->sum('count');
+        $totalMantraCount = (int) $this->shrineQuery(MantraRepetition::class)->sum('count');
 
         $shrineState = $this->buildShrineState();
 
         return view('shrine', compact(
+            'shrine',
             'lamps',
             'flowers',
             'dedicationNames',
@@ -72,6 +80,7 @@ class ShrineController extends Controller
 
     public function state(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
         $visitorToken = $request->string('visitor_token')->toString();
 
         return response()->json($this->buildShrineState(
@@ -99,6 +108,8 @@ class ShrineController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'name' => ['nullable', 'string', 'max:100'],
@@ -106,9 +117,10 @@ class ShrineController extends Controller
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null);
-        OfferingGuard::assertWithinLimit($visitorToken, ButterLamp::class, 'butter lamps');
+        OfferingGuard::assertWithinLimit($visitorToken, ButterLamp::class, 'butter lamps', $this->shrineSlug);
 
         $lamp = ButterLamp::create([
+            'shrine' => $this->shrineSlug,
             'name' => $name,
             'visitor_token' => $visitorToken,
             'expires_at' => OfferingGuard::expiresAt(),
@@ -123,21 +135,24 @@ class ShrineController extends Controller
             'dedication_names' => $this->dedicationNames(),
             'offering_names' => $this->offeringNames(),
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeMantra(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'count' => ['required', 'integer', 'min:1', 'max:100000'],
         ]);
 
         $visitorToken = $validated['visitor_token'];
-        OfferingGuard::assertWithinLimit($visitorToken, MantraRepetition::class, 'mantra contributions');
+        OfferingGuard::assertWithinLimit($visitorToken, MantraRepetition::class, 'mantra contributions', $this->shrineSlug);
 
         $offering = MantraRepetition::create([
+            'shrine' => $this->shrineSlug,
             'count' => $validated['count'],
             'visitor_token' => $visitorToken,
         ]);
@@ -148,16 +163,18 @@ class ShrineController extends Controller
                 'count' => $offering->count,
                 'created_at' => $offering->created_at?->toIso8601String(),
             ],
-            'total_count' => (int) MantraRepetition::query()->sum('count'),
+            'total_count' => (int) $this->shrineQuery(MantraRepetition::class)->sum('count'),
             'dedication_names' => $this->dedicationNames(),
             'offering_names' => $this->offeringNames(),
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeIncense(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'name' => ['nullable', 'string', 'max:100'],
@@ -165,9 +182,10 @@ class ShrineController extends Controller
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null);
-        OfferingGuard::assertWithinLimit($visitorToken, IncenseOffering::class, 'incense offerings');
+        OfferingGuard::assertWithinLimit($visitorToken, IncenseOffering::class, 'incense offerings', $this->shrineSlug);
 
         $offering = IncenseOffering::create([
+            'shrine' => $this->shrineSlug,
             'name' => $name,
             'visitor_token' => $visitorToken,
             'expires_at' => OfferingGuard::expiresAt(),
@@ -180,12 +198,14 @@ class ShrineController extends Controller
                 'expires_at' => $offering->expires_at->toIso8601String(),
             ],
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeFlower(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'name' => ['nullable', 'string', 'max:100'],
@@ -193,9 +213,10 @@ class ShrineController extends Controller
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null);
-        OfferingGuard::assertWithinLimit($visitorToken, FlowerOffering::class, 'flower offerings');
+        OfferingGuard::assertWithinLimit($visitorToken, FlowerOffering::class, 'flower offerings', $this->shrineSlug);
 
         $offering = FlowerOffering::create([
+            'shrine' => $this->shrineSlug,
             'name' => $name,
             'visitor_token' => $visitorToken,
             'flower_type' => self::FLOWER_TYPES[array_rand(self::FLOWER_TYPES)],
@@ -212,29 +233,39 @@ class ShrineController extends Controller
                 'created_at' => $offering->created_at?->toIso8601String(),
             ],
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeMusic(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
-            'track_id' => ['required', 'integer', 'exists:music_tracks,id'],
+            'track_id' => [
+                'required',
+                'integer',
+                Rule::exists('music_tracks', 'id')
+                    ->where('shrine', $this->shrineSlug)
+                    ->where('active', true),
+            ],
             'name' => ['nullable', 'string', 'max:100'],
         ]);
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null);
-        OfferingGuard::assertWithinLimit($visitorToken, MusicOffering::class, 'music offerings');
+        OfferingGuard::assertWithinLimit($visitorToken, MusicOffering::class, 'music offerings', $this->shrineSlug);
 
         $track = MusicTrack::query()
+            ->where('shrine', $this->shrineSlug)
             ->where('active', true)
             ->findOrFail($validated['track_id']);
 
         $side = $this->nextMusicSide();
 
         $offering = MusicOffering::create([
+            'shrine' => $this->shrineSlug,
             'music_track_id' => $track->id,
             'name' => $name,
             'visitor_token' => $visitorToken,
@@ -246,12 +277,14 @@ class ShrineController extends Controller
         return response()->json([
             'offering' => $this->formatMusicOffering($offering, $side),
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeMusicSuggestion(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'url' => ['required', 'string', 'max:500', 'regex:/(?:youtube\.com|youtu\.be)/i'],
@@ -260,9 +293,10 @@ class ShrineController extends Controller
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null, 'name');
-        OfferingGuard::assertWithinLimit($visitorToken, MusicSuggestion::class, 'music suggestions');
+        OfferingGuard::assertWithinLimit($visitorToken, MusicSuggestion::class, 'music suggestions', $this->shrineSlug);
 
         MusicSuggestion::create([
+            'shrine' => $this->shrineSlug,
             'youtube_url' => trim($validated['url']),
             'suggested_by_name' => $name,
             'visitor_token' => $visitorToken,
@@ -270,12 +304,14 @@ class ShrineController extends Controller
 
         return response()->json([
             'message' => 'Thank you — your suggestion has been recorded.',
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
     }
 
     public function storeWater(Request $request): JsonResponse
     {
+        $this->resolveShrine($request);
+
         $validated = $request->validate([
             'visitor_token' => ['required', 'uuid'],
             'name' => ['nullable', 'string', 'max:100'],
@@ -283,9 +319,10 @@ class ShrineController extends Controller
 
         $visitorToken = $validated['visitor_token'];
         $name = OfferingGuard::assertCleanName($validated['name'] ?? null);
-        OfferingGuard::assertWithinLimit($visitorToken, WaterBowlSession::class, 'water offerings');
+        OfferingGuard::assertWithinLimit($visitorToken, WaterBowlSession::class, 'water offerings', $this->shrineSlug);
 
         $session = WaterBowlSession::create([
+            'shrine' => $this->shrineSlug,
             'token' => (string) Str::uuid(),
             'visitor_token' => $visitorToken,
             'name' => $name,
@@ -302,8 +339,27 @@ class ShrineController extends Controller
             ],
             'shrine_state' => $this->buildShrineState(visitorToken: $visitorToken),
             'offering_names' => $this->offeringNames(),
-            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS),
+            'visitor_limits' => OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug),
         ], 201);
+    }
+
+    private function resolveShrine(Request $request): void
+    {
+        $slug = (string) $request->route('shrine', 'avalokiteshvara');
+
+        if (! ShrineRegistry::exists($slug)) {
+            abort(404);
+        }
+
+        $this->shrineSlug = $slug;
+    }
+
+    /**
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     */
+    private function shrineQuery(string $modelClass)
+    {
+        return $modelClass::query()->where('shrine', $this->shrineSlug);
     }
 
     /**
@@ -406,7 +462,7 @@ class ShrineController extends Controller
             'lamps' => $lamps,
             'flowers' => $flowers,
             'music' => $this->formatMusicState(),
-            'mantra_total' => (int) MantraRepetition::query()->sum('count'),
+            'mantra_total' => (int) $this->shrineQuery(MantraRepetition::class)->sum('count'),
             'dedication_names' => $this->dedicationNames(),
             'offering_names' => $this->offeringNames(),
             'live_practitioners' => $this->livePractitionerCount(),
@@ -417,7 +473,7 @@ class ShrineController extends Controller
         ];
 
         if ($visitorToken !== null) {
-            $state['visitor_limits'] = OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS);
+            $state['visitor_limits'] = OfferingGuard::limitsFor($visitorToken, self::VISITOR_LIMIT_MODELS, $this->shrineSlug);
         }
 
         return $state;
@@ -425,11 +481,11 @@ class ShrineController extends Controller
 
     private function pruneExpiredOfferings(): void
     {
-        ButterLamp::query()->where('expires_at', '<=', now())->delete();
-        FlowerOffering::query()->where('expires_at', '<=', now())->delete();
-        IncenseOffering::query()->where('expires_at', '<=', now())->delete();
-        MusicOffering::query()->where('expires_at', '<=', now())->delete();
-        WaterBowlSession::query()->where('expires_at', '<=', now())->delete();
+        ButterLamp::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        FlowerOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        IncenseOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        MusicOffering::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
+        WaterBowlSession::query()->where('shrine', $this->shrineSlug)->where('expires_at', '<=', now())->delete();
     }
 
     /**
@@ -437,7 +493,10 @@ class ShrineController extends Controller
      */
     private function activeOfferingQuery(string $modelClass)
     {
-        return OfferingGuard::applyActiveScope($modelClass::query(), $modelClass);
+        return OfferingGuard::applyActiveScope(
+            $this->shrineQuery($modelClass),
+            $modelClass,
+        );
     }
 
     /**
@@ -477,7 +536,7 @@ class ShrineController extends Controller
      */
     private function formatMusicState(): array
     {
-        $tracks = MusicTrack::query()
+        $tracks = $this->shrineQuery(MusicTrack::class)
             ->where('active', true)
             ->orderBy('title')
             ->get(['id', 'youtube_id', 'youtube_start_seconds', 'title', 'thumbnail_url'])

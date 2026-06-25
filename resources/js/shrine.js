@@ -10,6 +10,23 @@ import {
     waterBowlSvg,
 } from './offering-graphics.js';
 
+function loadShrineConfig() {
+    try {
+        return JSON.parse(document.getElementById('shrine-config')?.textContent ?? '{}');
+    } catch {
+        return {};
+    }
+}
+
+const shrineClient = loadShrineConfig();
+const SHRINE_SLUG = shrineClient.slug ?? 'avalokiteshvara';
+const API_BASE = shrineClient.apiBase ?? '';
+const HEARTBEAT_PATH = shrineClient.heartbeatPath ?? '/practitioner-presence';
+
+function apiUrl(path) {
+    return `${API_BASE}${path}`;
+}
+
 const OFFERING_FLAME_ID = 'offering-flame';
 const OFFERED_LAMPS_ID = 'offered-lamps';
 const OFFERED_MUSIC_ID = 'offered-music';
@@ -46,12 +63,12 @@ const INCENSE_SHRINE_EXTRA_ID = 'incense-shrine-extra';
 const MAX_STICKS_PER_HOLDER = 3;
 const SYLLABLE_SMOKE_ID = 'syllable-smoke';
 const OFFERED_WATER_ID = 'offered-water-bowls';
-const VISITOR_TOKEN_KEY = 'shrine_visitor_token';
+const VISITOR_TOKEN_KEY = `shrine_visitor_token_${SHRINE_SLUG}`;
 const PRACTITIONER_TOKEN_KEY = VISITOR_TOKEN_KEY;
 const LIVE_PRACTITIONERS_COUNT_ID = 'live-practitioners-count';
 const SHRINE_POLL_MS = 4000;
-const COOKIE_CONSENT_KEY = 'shrine_cookies_accepted';
-const REFUGE_DISMISSED_KEY = 'shrine_refuge_dismissed';
+const COOKIE_CONSENT_KEY = `shrine_cookies_accepted_${SHRINE_SLUG}`;
+const REFUGE_DISMISSED_KEY = `shrine_refuge_dismissed_${SHRINE_SLUG}`;
 const COOKIE_CONSENT_ID = 'cookie-consent';
 const REFUGE_MODAL_ID = 'refuge-modal';
 const DEDICATION_MODAL_ID = 'dedication-modal';
@@ -98,6 +115,7 @@ const LAMP_RAY_INTERVAL_BASE = 2600;
 const LAMP_RAY_INTERVAL_PER_LAMP = 220;
 const LAMP_RAY_INTERVAL_MIN = 750;
 const OFFERING_NAME_SELECTOR = '.offering-name, .lamp-name, .music-offering-name, .water-offering-name';
+const SYLLABLE_TARGET_SELECTOR = `${OFFERING_NAME_SELECTOR}, .deity-crosslink`;
 
 let syllableSmokeStartedAt = 0;
 let currentIncenseSticks = 1;
@@ -477,7 +495,7 @@ async function selectMusicTrack(track, cardEl) {
     try {
         await animateMusicToAltar(sourceRect, track);
 
-        const response = await fetch('/music-offerings', {
+        const response = await fetch(apiUrl('/music-offerings'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -524,7 +542,7 @@ async function submitMusicSuggestion() {
     btn?.setAttribute('disabled', 'disabled');
 
     try {
-        const response = await fetch('/music-suggestions', {
+        const response = await fetch(apiUrl('/music-suggestions'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -691,7 +709,11 @@ function getOfferedButterLamps() {
 }
 
 function getOfferingNameTargets() {
-    return [...document.querySelectorAll(OFFERING_NAME_SELECTOR)].filter((element) => {
+    return [...document.querySelectorAll(SYLLABLE_TARGET_SELECTOR)].filter((element) => {
+        if (element.classList.contains('deity-crosslink')) {
+            return isVisibleInViewport(element);
+        }
+
         if ((element.textContent?.trim() ?? '') === '') {
             return false;
         }
@@ -1055,7 +1077,7 @@ function getPractitionerToken() {
 
 async function sendPractitionerHeartbeat() {
     try {
-        const response = await fetch('/practitioner-presence', {
+        const response = await fetch(HEARTBEAT_PATH, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1336,7 +1358,7 @@ async function offerWater() {
     const name = nameInput?.value.trim() ?? '';
 
     try {
-        const response = await fetch('/water-offerings', {
+        const response = await fetch(apiUrl('/water-offerings'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1636,7 +1658,7 @@ async function offerLamp() {
     const name = nameInput?.value.trim() ?? '';
 
     try {
-        const response = await fetch('/butter-lamps', {
+        const response = await fetch(apiUrl('/butter-lamps'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1737,7 +1759,7 @@ async function addMantraRepetitions() {
     addBtn?.setAttribute('disabled', 'disabled');
 
     try {
-        const response = await fetch('/mantra-repetitions', {
+        const response = await fetch(apiUrl('/mantra-repetitions'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1773,7 +1795,7 @@ async function offerIncense() {
     btn?.setAttribute('disabled', 'disabled');
 
     try {
-        const response = await fetch('/incense-offerings', {
+        const response = await fetch(apiUrl('/incense-offerings'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1810,7 +1832,7 @@ async function offerFlower() {
     const name = nameInput?.value.trim() ?? '';
 
     try {
-        const response = await fetch('/flower-offerings', {
+        const response = await fetch(apiUrl('/flower-offerings'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1884,7 +1906,7 @@ async function refreshShrineState() {
             visitor_token: getVisitorToken(),
         });
 
-        const response = await fetch(`/offerings/state?${params.toString()}`, {
+        const response = await fetch(apiUrl(`/offerings/state?${params.toString()}`), {
             headers: { Accept: 'application/json' },
         });
 

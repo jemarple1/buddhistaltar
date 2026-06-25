@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lit butter lamp on a light blue sky">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6bbef7"/>
+      <stop offset="45%" stop-color="#4aabf0"/>
+      <stop offset="100%" stop-color="#93d0fa"/>
+    </linearGradient>
+    <linearGradient id="bronze" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8dc"/>
+      <stop offset="18%" stop-color="#f0d060"/>
+      <stop offset="48%" stop-color="#c9a227"/>
+      <stop offset="78%" stop-color="#7a5c10"/>
+      <stop offset="100%" stop-color="#2a2006"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4a3808"/>
+      <stop offset="20%" stop-color="#e8d48a"/>
+      <stop offset="50%" stop-color="#fffef5"/>
+      <stop offset="80%" stop-color="#e8d48a"/>
+      <stop offset="100%" stop-color="#4a3808"/>
+    </linearGradient>
+    <radialGradient id="flame" cx="50%" cy="88%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="28%" stop-color="#ffe9a8"/>
+      <stop offset="58%" stop-color="#ff8c1a"/>
+      <stop offset="100%" stop-color="#cc3300" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aura" cx="50%" cy="72%" r="68%">
+      <stop offset="0%" stop-color="#ffc866" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#ff5500" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <ellipse cx="256" cy="430" rx="118" ry="24" fill="#000" opacity="0.16"/>
+  <g transform="translate(256 300) scale(4.2)">
+    <ellipse cx="0" cy="34" rx="17" ry="3.5" fill="#000" opacity="0.22"/>
+    <path d="M-15 14 C-17 28 -13 32 0 32 C13 32 17 28 15 14 Z" fill="url(#bronze)" stroke="#3d2e08" stroke-width="0.75"/>
+    <path d="M-13 14 Q0 9 13 14" fill="none" stroke="url(#rim)" stroke-width="1.7"/>
+    <ellipse cx="0" cy="16" rx="12" ry="2.2" fill="#fff8dc" opacity="0.4"/>
+    <ellipse cx="0" cy="20" rx="10" ry="3.8" fill="#fbbf24" opacity="0.28"/>
+    <ellipse cx="-4" cy="19" rx="3" ry="1.2" fill="#fffef0" opacity="0.35"/>
+    <g filter="url(#glow)">
+      <ellipse cx="0" cy="0" rx="15" ry="17" fill="url(#aura)"/>
+      <path d="M0 -19 C7 -7 5 5 2 9 C0 11 -2 9 -4 5 C-5 -7 0 -19 Z" fill="url(#flame)"/>
+      <path d="M0 -15 C2 -7 1 1 0 3 C-1 1 -2 -7 0 -15 Z" fill="#fffff5" opacity="0.75"/>
+    </g>
+  </g>
+</svg>

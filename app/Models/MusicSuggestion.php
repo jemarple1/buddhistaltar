@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class MusicSuggestion extends Model
 {
     protected $fillable = [
+        'shrine',
         'youtube_url',
         'suggested_by_name',
         'visitor_token',

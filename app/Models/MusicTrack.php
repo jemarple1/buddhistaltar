@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class MusicTrack extends Model
 {
     protected $fillable = [
+        'shrine',
         'youtube_id',
         'youtube_start_seconds',
         'title',

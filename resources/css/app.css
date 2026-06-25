@@ -57,10 +57,75 @@
         display: flex;
         justify-content: center;
         width: 100%;
-        margin: 0;
+        max-width: 28rem;
+        margin: 0 auto;
         padding: 0;
         background: transparent;
         isolation: isolate;
+    }
+
+    @media (min-width: 640px) {
+        .deity-hero {
+            max-width: 32rem;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .deity-hero {
+            max-width: 36rem;
+        }
+    }
+
+    .deity-image,
+    .avalokiteshvara-image {
+        position: relative;
+        z-index: 1;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        margin: 0 auto;
+        image-rendering: auto;
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+
+    .deity-image--amitabha {
+        filter: drop-shadow(0 10px 28px rgba(12, 74, 110, 0.22));
+    }
+
+    .deity-crosslink {
+        position: absolute;
+        top: 8%;
+        right: 2%;
+        z-index: 4;
+        display: block;
+        width: clamp(3.25rem, 16vw, 4.75rem);
+        border-radius: 9999px;
+        overflow: hidden;
+        border: 2px solid rgba(255, 255, 255, 0.72);
+        box-shadow:
+            0 8px 24px rgba(0, 0, 0, 0.28),
+            0 0 0 1px rgba(255, 255, 255, 0.18);
+        animation: deity-crosslink-float 5.5s ease-in-out infinite;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .deity-crosslink:hover,
+    .deity-crosslink:focus-visible {
+        transform: scale(1.06);
+        box-shadow:
+            0 12px 28px rgba(0, 0, 0, 0.32),
+            0 0 18px rgba(255, 255, 255, 0.35);
+    }
+
+    .deity-crosslink-image {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1;
+        object-fit: cover;
+        background: rgba(255, 255, 255, 0.12);
     }
 
     .deity-radiance {
@@ -111,31 +176,6 @@
         filter: blur(18px);
         opacity: 0.85;
         mix-blend-mode: screen;
-    }
-
-    .avalokiteshvara-image {
-        position: relative;
-        z-index: 1;
-        display: block;
-        width: 100%;
-        max-width: 28rem;
-        height: auto;
-        margin: 0 auto;
-        image-rendering: auto;
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-    }
-
-    @media (min-width: 640px) {
-        .avalokiteshvara-image {
-            max-width: 32rem;
-        }
-    }
-
-    @media (min-width: 768px) {
-        .avalokiteshvara-image {
-            max-width: 36rem;
-        }
     }
 
     .offering-panel {
@@ -493,15 +533,16 @@
     .syllable-smoke {
         position: fixed;
         inset: 0;
-        width: 100vw;
+        width: 100%;
         height: 100dvh;
         z-index: 1;
         pointer-events: none;
         overflow: hidden;
+        transform: translateZ(0);
     }
 
     .syllable-particle {
-        position: absolute;
+        position: fixed;
         font-family: var(--font-spectral);
         font-weight: 600;
         line-height: 1;
@@ -1048,6 +1089,7 @@
         background: rgba(255, 255, 255, 0.85);
         border: 1px solid rgba(56, 130, 180, 0.35);
         color: rgba(12, 74, 110, 0.95);
+        font-size: 16px;
     }
 
     .name-input::placeholder {
@@ -1308,6 +1350,16 @@
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes deity-crosslink-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-6px);
     }
 }
 

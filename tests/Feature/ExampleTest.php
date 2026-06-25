@@ -102,7 +102,9 @@ class ExampleTest extends TestCase
 
     public function test_music_offering_plays_beside_the_shrine(): void
     {
-        $trackId = (int) \Illuminate\Support\Facades\DB::table('music_tracks')->value('id');
+        $trackId = (int) \Illuminate\Support\Facades\DB::table('music_tracks')
+            ->where('shrine', 'avalokiteshvara')
+            ->value('id');
 
         $response = $this->postJson('/music-offerings', $this->visitorPayload([
             'track_id' => $trackId,
@@ -207,5 +209,31 @@ class ExampleTest extends TestCase
         $response->assertJsonPath('incense.sticks', 2);
         $response->assertJsonPath('lamps', []);
         $response->assertJsonPath('water.display_name', null);
+    }
+
+    public function test_amitabha_shrine_page_loads(): void
+    {
+        $response = $this->get('/amitabha');
+
+        $response->assertStatus(200);
+        $response->assertSee('Namo Amitabhaya!');
+        $response->assertSee('Homage to the Buddha of Boundless Light!');
+        $response->assertSee('Read the Prayer');
+        $response->assertSee('Prayer to Buddha Amitābha', false);
+        $response->assertSee('oṃ amitābha hrīḥ');
+        $response->assertSee('Visit the Avalokiteśvara shrine', false);
+    }
+
+    public function test_amitabha_offerings_are_isolated_from_avalokiteshvara(): void
+    {
+        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
+        $this->postJson('/amitabha/butter-lamps', $this->visitorPayload(['name' => 'Amitabha']))->assertCreated();
+
+        $avalokiteshvara = $this->getJson('/offerings/state');
+        $avalokiteshvara->assertJsonPath('lamps.0.name', 'Chenrezik');
+
+        $amitabha = $this->getJson('/amitabha/offerings/state');
+        $amitabha->assertJsonPath('lamps.0.name', 'Amitabha');
+        $amitabha->assertJsonMissing(['name' => 'Chenrezik']);
     }
 }

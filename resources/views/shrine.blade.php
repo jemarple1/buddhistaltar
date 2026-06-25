@@ -2,41 +2,74 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Offer a butter lamp and recite the dhāraṇī of Noble Avalokiteśvara.">
-    <title>Namo Avalokiteshvaraya — Shrine Offerings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="{{ $shrine['meta_description'] }}">
+    <meta name="theme-color" content="#4aabf0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Shrine Offerings">
+    <title>{{ $shrine['page_title'] }}</title>
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('icons/favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('icons/apple-touch-icon.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/shrine.js'])
 </head>
-<body class="shrine-bg min-h-screen text-sky-950 antialiased overflow-x-hidden">
-    <div class="sky-clouds" aria-hidden="true"></div>
+@php
+    $deityImagePath = public_path($shrine['deity_image']);
+    $deityImageVersion = file_exists($deityImagePath) ? filemtime($deityImagePath) : time();
+    $crosslinkImagePath = isset($shrine['crosslink']['image']) ? public_path($shrine['crosslink']['image']) : null;
+    $crosslinkImageVersion = $crosslinkImagePath && file_exists($crosslinkImagePath) ? filemtime($crosslinkImagePath) : time();
+@endphp
+<body class="{{ $shrine['body_class'] }} min-h-screen text-sky-950 antialiased">
+    @if ($shrine['show_sky_clouds'])
+        <div class="sky-clouds" aria-hidden="true"></div>
+    @endif
     <div id="syllable-smoke" class="syllable-smoke" aria-hidden="true"></div>
 
     <script type="application/json" id="shrine-state">@json($shrineState)</script>
+    <script type="application/json" id="shrine-config">@json(\App\Support\ShrineRegistry::clientConfig($shrine['slug']))</script>
 
-    <div class="relative flex min-h-screen flex-col">
+    <div class="relative flex min-h-screen flex-col overflow-x-hidden">
         <div class="light-rays" aria-hidden="true"></div>
 
         <header class="relative z-10 flex flex-1 flex-col items-center pb-4">
             <div class="deity-hero w-full">
                 <img
-                    src="{{ asset('images/avalokiteshvara.webp') }}?v={{ filemtime(public_path('images/avalokiteshvara.webp')) }}"
-                    alt="Avalokiteshvara, homage to the one who looks upon beings with compassion"
+                    src="{{ asset($shrine['deity_image']) }}?v={{ $deityImageVersion }}"
+                    alt="{{ $shrine['deity_alt'] }}"
                     width="1024"
                     height="1024"
-                    class="avalokiteshvara-image"
+                    class="{{ $shrine['deity_image_class'] }}"
                     loading="eager"
                     decoding="async"
                 >
+                @if (! empty($shrine['crosslink']))
+                    <a
+                        href="{{ url($shrine['crosslink']['url']) }}"
+                        class="deity-crosslink"
+                        aria-label="{{ $shrine['crosslink']['label'] }}"
+                        title="{{ $shrine['crosslink']['label'] }}"
+                    >
+                        <img
+                            src="{{ asset($shrine['crosslink']['image']) }}?v={{ $crosslinkImageVersion }}"
+                            alt=""
+                            class="deity-crosslink-image"
+                            loading="lazy"
+                            decoding="async"
+                        >
+                    </a>
+                @endif
             </div>
 
             <div class="deity-title-row mt-4 px-4">
                 <div class="deity-title">
                     <h1 class="font-medium tracking-wide text-white drop-shadow-md sm:text-2xl">
-                        Namo Avalokiteshvaraya!
+                        {{ $shrine['title'] }}
                     </h1>
                     <p class="mt-1 italic text-white/85 drop-shadow-sm">
-                        Homage to The One Who Looks Upon Beings with Compassion!
+                        {{ $shrine['subtitle'] }}
                     </p>
                 </div>
             </div>
@@ -159,7 +192,7 @@
                         <h2 id="mantra-heading" class="text-sm tracking-[0.25em] uppercase text-sky-950/80">Mantra Repetitions</h2>
                         <p class="mt-1 text-xs text-sky-950/55">Add your recitations to the pooled count</p>
                         <button type="button" id="btn-open-sutra" class="btn-shrine mt-4 rounded px-6 py-2.5 text-sm tracking-wide">
-                            Read the Sutra
+                            {{ $shrine['read_prayer_label'] }}
                         </button>
                     </div>
 
@@ -230,11 +263,11 @@
         <div class="shrine-modal-backdrop" data-close-sutra aria-hidden="true"></div>
         <div class="shrine-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sutra-modal-title">
             <div class="shrine-modal-header">
-                <h2 id="sutra-modal-title" class="text-sm font-medium tracking-wide text-sky-950">The Dhāraṇī of Noble Avalokiteśvara</h2>
+                <h2 id="sutra-modal-title" class="text-sm font-medium tracking-wide text-sky-950">{{ $shrine['prayer_modal_title'] }}</h2>
                 <button type="button" id="btn-close-sutra" class="shrine-modal-close" aria-label="Close sutra">&times;</button>
             </div>
             <div class="shrine-modal-body">
-                @include('partials.dharani-sutra')
+                @include($shrine['prayer_partial'])
             </div>
         </div>
     </div>
