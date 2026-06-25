@@ -364,20 +364,14 @@ function renderMusicOfferings(musicState) {
     }
 
     const active = musicState?.active ?? [];
-    const activeIds = new Set(active.map((offering) => String(offering.id)));
 
-    container.querySelectorAll('.music-player').forEach((player) => {
-        if (!activeIds.has(player.dataset.offeringId ?? '')) {
-            player.remove();
-        }
-    });
-
-    active.forEach((offering) => {
-        if (container.querySelector(`[data-offering-id="${offering.id}"]`)) {
-            return;
-        }
-
-        container.appendChild(createMusicPlayerElement(offering));
+    syncOfferingRow(container, active, {
+        idKey: 'offeringId',
+        createItem: (offering) => {
+            const player = createMusicPlayerElement(offering);
+            player.classList.add('music-player');
+            return player;
+        },
     });
 }
 
@@ -1123,6 +1117,98 @@ function offeringRowLandingPoint(container) {
     };
 }
 
+function offeringRowAppendPoint(container, itemSelector) {
+    if (!container) {
+        return null;
+    }
+
+    const items = container.querySelectorAll(itemSelector);
+    if (items.length > 0) {
+        const last = items[items.length - 1];
+        const rect = last.getBoundingClientRect();
+
+        return {
+            x: rect.right + 28,
+            y: rect.top + rect.height / 2,
+        };
+    }
+
+    return offeringRowLandingPoint(container);
+}
+
+function syncOfferingRow(container, items, options) {
+    if (!container) {
+        return;
+    }
+
+    const { idKey, createItem, updateItem } = options;
+    const itemIds = new Set(items.map((item) => String(item.id)));
+    const orderedElements = [];
+
+    items.forEach((item) => {
+        let element = container.querySelector(`[data-${idKey}="${item.id}"]`);
+
+        if (!element) {
+            element = createItem(item);
+        } else if (updateItem) {
+            updateItem(element, item);
+        }
+
+        if (item.is_permanent) {
+            element.dataset.isPermanent = 'true';
+        }
+
+        orderedElements.push(element);
+    });
+
+    container.querySelectorAll(`[data-${idKey}]`).forEach((element) => {
+        const id = element.dataset[idKey] ?? '';
+        if (element.dataset.isPermanent === 'true') {
+            return;
+        }
+
+        if (!itemIds.has(id)) {
+            element.remove();
+        }
+    });
+
+    orderedElements.forEach((element) => {
+        container.appendChild(element);
+    });
+}
+
+function updateFlowerElement(element, flower) {
+    const label = element.querySelector('.offering-name');
+    const name = flower.name ?? '';
+
+    if (name && label) {
+        label.textContent = name;
+    } else if (name && !label) {
+        const nextLabel = document.createElement('span');
+        nextLabel.className = 'offering-name';
+        nextLabel.textContent = name;
+        element.appendChild(nextLabel);
+    } else if (!name && label) {
+        label.remove();
+    }
+}
+
+function updateLampElement(element, lamp) {
+    const label = element.querySelector('.lamp-name');
+    const name = lamp.name ?? '';
+
+    if (name && label) {
+        label.textContent = name;
+    } else if (name && !label) {
+        const nextLabel = document.createElement('span');
+        nextLabel.className = 'lamp-name';
+        nextLabel.textContent = name;
+        element.appendChild(nextLabel);
+    } else if (!name && label) {
+        label.remove();
+    }
+}
+
 function seedOfferedLamps() {
     const container = document.getElementById(OFFERED_LAMPS_ID);
     const lamps = container?.querySelectorAll('.butter-lamp[data-lamp-id]') ?? [];
@@ -1134,50 +1220,25 @@ function seedOfferedLamps() {
 }
 
 function syncFlowers(flowers) {
-    const container = document.getElementById(OFFERED_FLOWERS_ID);
-    if (!container) {
-        return;
-    }
-
-    const ids = new Set(flowers.map((flower) => String(flower.id)));
-
-    container.querySelectorAll('[data-flower-id]').forEach((element) => {
-        if (!ids.has(element.dataset.flowerId ?? '')) {
-            element.remove();
-        }
-    });
-
-    flowers.forEach((flower) => {
-        if (container.querySelector(`[data-flower-id="${flower.id}"]`)) {
-            return;
-        }
-
-        container.appendChild(
-            createFlowerElement(flower.name, flower.id, flower.flower_type, flower.vase_color, false),
-        );
+    syncOfferingRow(document.getElementById(OFFERED_FLOWERS_ID), flowers ?? [], {
+        idKey: 'flowerId',
+        createItem: (flower) => createFlowerElement(
+            flower.name,
+            flower.id,
+            flower.flower_type,
+            flower.vase_color,
+            false,
+            flower.is_permanent,
+        ),
+        updateItem: updateFlowerElement,
     });
 }
 
 function syncLamps(lamps) {
-    const container = document.getElementById(OFFERED_LAMPS_ID);
-    if (!container) {
-        return;
-    }
-
-    const ids = new Set(lamps.map((lamp) => String(lamp.id)));
-
-    container.querySelectorAll('[data-lamp-id]').forEach((element) => {
-        if (!ids.has(element.dataset.lampId ?? '')) {
-            element.remove();
-        }
-    });
-
-    lamps.forEach((lamp) => {
-        if (container.querySelector(`[data-lamp-id="${lamp.id}"]`)) {
-            return;
-        }
-
-        container.appendChild(createLampElement(lamp.name, lamp.id, false));
+    syncOfferingRow(document.getElementById(OFFERED_LAMPS_ID), lamps ?? [], {
+        idKey: 'lampId',
+        createItem: (lamp) => createLampElement(lamp.name, lamp.id, false, lamp.is_permanent),
+        updateItem: updateLampElement,
     });
 
     startLampRayInterval();
@@ -1213,7 +1274,7 @@ function hydrateFlowerVases() {
     });
 }
 
-function createFlowerElement(name, id = null, flowerType = null, vaseColor = null, animate = true) {
+function createFlowerElement(name, id = null, flowerType = null, vaseColor = null, animate = true, isPermanent = false) {
     const flower = document.createElement('div');
     flower.className = `flower-vase${animate ? ' offered-flower' : ''}`;
     const type = flowerType || randomFlowerType();
@@ -1222,6 +1283,9 @@ function createFlowerElement(name, id = null, flowerType = null, vaseColor = nul
     flower.dataset.vaseColor = color;
     if (id) {
         flower.dataset.flowerId = String(id);
+    }
+    if (isPermanent) {
+        flower.dataset.isPermanent = 'true';
     }
 
     flower.innerHTML = flowerSvg(type, color);
@@ -1236,13 +1300,16 @@ function createFlowerElement(name, id = null, flowerType = null, vaseColor = nul
     return flower;
 }
 
-function createLampElement(name, id = null, animate = true) {
+function createLampElement(name, id = null, animate = true, isPermanent = false) {
     const lamp = document.createElement('div');
     lamp.className = `butter-lamp${animate ? ' offered-lamp' : ''}`;
     lamp.innerHTML = lampSvg({ lit: true });
 
     if (id) {
         lamp.dataset.lampId = String(id);
+    }
+    if (isPermanent) {
+        lamp.dataset.isPermanent = 'true';
     }
 
     if (name) {
@@ -1675,7 +1742,7 @@ async function offerLamp() {
         }
         const savedName = data.lamp?.name ?? null;
         const offeredContainer = document.getElementById(OFFERED_LAMPS_ID);
-        const landing = offeringRowLandingPoint(offeredContainer);
+        const landing = offeringRowAppendPoint(offeredContainer, '[data-lamp-id]');
 
         if (offeringLamp && landing) {
             const sourceRect = offeringLamp.getBoundingClientRect();
@@ -1850,7 +1917,7 @@ async function offerFlower() {
 
         const offering = data.offering;
         const flowerContainer = document.getElementById(OFFERED_FLOWERS_ID);
-        const landing = offeringRowLandingPoint(flowerContainer);
+        const landing = offeringRowAppendPoint(flowerContainer, '[data-flower-id]');
 
         if (preview && landing && offering) {
             const sourceRect = preview.getBoundingClientRect();

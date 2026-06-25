@@ -118,7 +118,7 @@ class ExampleTest extends TestCase
         $response->assertJsonPath('offering.side', 'left');
         $response->assertJsonPath('offering.track.youtube_id', 'QZ94XtY_fJM');
         $response->assertJsonPath('offering.track.title', 'Snow Lion by Tenzin Chogyal');
-        $response->assertJsonPath('offering.track.youtube_start_seconds', 814);
+        $response->assertJsonPath('offering.track.youtube_start_seconds', 798);
         $response->assertJsonFragment(['name' => 'Mila']);
         $response->assertJsonFragment(['name' => 'All Beings']);
     }
@@ -226,7 +226,20 @@ class ExampleTest extends TestCase
             $response->assertJsonFragment(['name' => 'All Beings']);
             $response->assertJsonPath('music.active.0.name', 'All Beings');
             $response->assertJsonPath('music.active.0.track.title', 'Snow Lion by Tenzin Chogyal');
+            $response->assertJsonPath('music.active.0.track.youtube_start_seconds', 798);
         }
+    }
+
+    public function test_visitor_flower_is_added_alongside_all_beings_flower(): void
+    {
+        $this->postJson('/flower-offerings', $this->visitorPayload(['name' => 'Lotus']))->assertCreated();
+
+        $response = $this->getJson('/offerings/state');
+
+        $response->assertOk();
+        $response->assertJsonFragment(['name' => 'All Beings']);
+        $response->assertJsonFragment(['name' => 'Lotus']);
+        $response->assertJsonPath('flowers.0.name', 'All Beings');
     }
 
     public function test_each_shrine_shares_the_same_music_catalog(): void

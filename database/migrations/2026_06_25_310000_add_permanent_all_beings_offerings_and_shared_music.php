@@ -18,7 +18,7 @@ return new class extends Migration
     private const MUSIC_CATALOG = [
         [
             'youtube_id' => 'QZ94XtY_fJM',
-            'youtube_start_seconds' => 814,
+            'youtube_start_seconds' => 798,
             'title' => 'Snow Lion by Tenzin Chogyal',
             'thumbnail_url' => 'https://img.youtube.com/vi/QZ94XtY_fJM/mqdefault.jpg',
         ],

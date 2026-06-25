@@ -111,7 +111,13 @@
 
             <div id="offered-flowers" class="offering-row offering-row--flowers mt-4 px-4" aria-label="Flower offerings">
                 @foreach ($flowers as $flower)
-                    <div class="flower-vase offered-flower" data-flower-id="{{ $flower->id }}" data-flower-type="{{ $flower->flower_type ?? 'lotus' }}" data-vase-color="{{ $flower->vase_color ?? 'blue' }}">
+                    <div
+                        class="flower-vase offered-flower"
+                        data-flower-id="{{ $flower->id }}"
+                        data-flower-type="{{ $flower->flower_type ?? 'lotus' }}"
+                        data-vase-color="{{ $flower->vase_color ?? 'blue' }}"
+                        @if ($flower->is_permanent) data-is-permanent="true" @endif
+                    >
                         @if ($flower->name)
                             <span class="offering-name">{{ $flower->name }}</span>
                         @endif
@@ -121,7 +127,11 @@
 
             <div id="offered-lamps" class="offering-row offering-row--lamps mt-3 px-4" aria-label="Public butter lamp offerings">
                 @foreach ($lamps as $lamp)
-                    <div class="butter-lamp offered-lamp" data-lamp-id="{{ $lamp->id }}">
+                    <div
+                        class="butter-lamp offered-lamp"
+                        data-lamp-id="{{ $lamp->id }}"
+                        @if ($lamp->is_permanent) data-is-permanent="true" @endif
+                    >
                         @if ($lamp->name)
                             <span class="lamp-name">{{ $lamp->name }}</span>
                         @endif

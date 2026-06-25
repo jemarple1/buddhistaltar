@@ -12,6 +12,7 @@ use App\Models\MusicTrack;
 use App\Models\PractitionerPresence;
 use App\Models\WaterBowlSession;
 use App\Support\OfferingGuard;
+use App\Support\PermanentOfferings;
 use App\Support\ShrineRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,15 +45,16 @@ class ShrineController extends Controller
     public function index(Request $request): View
     {
         $this->resolveShrine($request);
+        PermanentOfferings::ensureForShrine($this->shrineSlug);
         $shrine = ShrineRegistry::config($this->shrineSlug);
 
         $lamps = $this->orderedOfferingQuery(ButterLamp::class)
             ->limit(200)
-            ->get(['id', 'name', 'created_at']);
+            ->get(['id', 'name', 'is_permanent', 'created_at']);
 
         $flowers = $this->orderedOfferingQuery(FlowerOffering::class)
             ->limit(100)
-            ->get(['id', 'name', 'flower_type', 'vase_color', 'created_at']);
+            ->get(['id', 'name', 'flower_type', 'vase_color', 'is_permanent', 'created_at']);
 
         $dedicationNames = $this->dedicationNames();
 
@@ -421,6 +423,7 @@ class ShrineController extends Controller
      */
     private function buildShrineState(?string $visitorToken = null): array
     {
+        PermanentOfferings::ensureForShrine($this->shrineSlug);
         $this->pruneExpiredOfferings();
 
         $displayWater = $this->activeOfferingQuery(WaterBowlSession::class)
@@ -430,22 +433,24 @@ class ShrineController extends Controller
 
         $lamps = $this->orderedOfferingQuery(ButterLamp::class)
             ->limit(200)
-            ->get(['id', 'name', 'created_at'])
+            ->get(['id', 'name', 'is_permanent', 'created_at'])
             ->map(fn (ButterLamp $lamp) => [
                 'id' => $lamp->id,
                 'name' => $lamp->name,
+                'is_permanent' => (bool) $lamp->is_permanent,
             ])
             ->values()
             ->all();
 
         $flowers = $this->orderedOfferingQuery(FlowerOffering::class)
             ->limit(100)
-            ->get(['id', 'name', 'flower_type', 'vase_color', 'created_at'])
+            ->get(['id', 'name', 'flower_type', 'vase_color', 'is_permanent', 'created_at'])
             ->map(fn (FlowerOffering $flower) => [
                 'id' => $flower->id,
                 'name' => $flower->name,
                 'flower_type' => $flower->flower_type,
                 'vase_color' => $flower->vase_color ?? 'blue',
+                'is_permanent' => (bool) $flower->is_permanent,
             ])
             ->values()
             ->all();
@@ -582,6 +587,7 @@ class ShrineController extends Controller
         return [
             'id' => $offering->id,
             'name' => $offering->name,
+            'is_permanent' => (bool) $offering->is_permanent,
             'side' => $side,
             'expires_at' => $offering->expires_at?->toIso8601String(),
             'track' => [
