@@ -55,6 +55,7 @@ class ExampleTest extends TestCase
         $response->assertSee('Visit the Amitābha shrine', false);
         $response->assertSee('Buddhist Altar', false);
         $response->assertSee('Add Buddhist Altar to your home screen', false);
+        $response->assertSee('full app experience', false);
         $response->assertSee('Remind me when my offerings expire', false);
     }
 

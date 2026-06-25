@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <meta name="description" content="{{ $shrine['meta_description'] }}">
     <meta name="theme-color" content="#4aabf0">
     <meta name="mobile-web-app-capable" content="yes">
@@ -257,6 +257,7 @@
             <img src="{{ asset('icons/icon-192.png') }}" alt="" class="install-prompt-icon" width="48" height="48">
             <p id="install-prompt-title" class="install-prompt-title">Add Buddhist Altar to your home screen</p>
         </div>
+        <p class="install-prompt-text">Adding the app to your home screen unlocks the full app experience, including offering reminders and a dedicated shrine icon.</p>
         <p id="install-prompt-instructions" class="install-prompt-text"></p>
         <label class="install-prompt-checkbox">
             <input type="checkbox" id="install-enable-notifications">

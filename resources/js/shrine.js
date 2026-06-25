@@ -76,6 +76,7 @@ const INSTALL_PROMPT_ID = 'install-prompt';
 const INSTALL_PROMPT_INSTRUCTIONS_ID = 'install-prompt-instructions';
 const INSTALL_ENABLE_NOTIFICATIONS_ID = 'install-enable-notifications';
 const BTN_DISMISS_INSTALL_ID = 'btn-dismiss-install';
+const INSTALL_PROMPT_DELAY_MS = 30000;
 const REFUGE_MODAL_ID = 'refuge-modal';
 const DEDICATION_MODAL_ID = 'dedication-modal';
 const BTN_ACCEPT_COOKIES_ID = 'btn-accept-cookies';
@@ -105,6 +106,9 @@ let shrinePollInterval = null;
 let practitionerHeartbeatInterval = null;
 let visitorOfferingTimers = new Map();
 let notifiedVisitorOfferings = new Set();
+let installPromptTimer = null;
+let installPromptScheduled = false;
+const pageLoadedAt = Date.now();
 
 const CLOUD_TARGET_BASE = 36;
 const CLOUD_TARGET_PER_STICK = 14;
@@ -1607,7 +1611,25 @@ function acceptCookies() {
         banner.setAttribute('aria-hidden', 'true');
     }
 
-    maybeShowInstallPrompt();
+    scheduleInstallPrompt();
+}
+
+function scheduleInstallPrompt() {
+    if (
+        installPromptScheduled
+        || !localStorage.getItem(COOKIE_CONSENT_KEY)
+        || localStorage.getItem(INSTALL_PROMPT_DISMISSED_KEY)
+        || isStandaloneApp()
+    ) {
+        return;
+    }
+
+    installPromptScheduled = true;
+
+    const elapsed = Date.now() - pageLoadedAt;
+    const delay = Math.max(0, INSTALL_PROMPT_DELAY_MS - elapsed);
+
+    installPromptTimer = window.setTimeout(maybeShowInstallPrompt, delay);
 }
 
 function isStandaloneApp() {
@@ -1805,7 +1827,7 @@ function initFirstVisitPrompts() {
     showCookieConsent();
 
     if (localStorage.getItem(COOKIE_CONSENT_KEY)) {
-        maybeShowInstallPrompt();
+        scheduleInstallPrompt();
     }
 
     if (!localStorage.getItem(REFUGE_DISMISSED_KEY)) {
