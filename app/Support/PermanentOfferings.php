@@ -25,31 +25,29 @@ class PermanentOfferings
                 'updated_at' => $now,
             ]);
 
-        if (! DB::table('butter_lamps')->where('shrine', $shrine)->where('is_permanent', true)->exists()) {
-            DB::table('butter_lamps')->insert([
-                'shrine' => $shrine,
-                'is_permanent' => true,
+        self::ensureSinglePermanent(
+            table: 'butter_lamps',
+            shrine: $shrine,
+            now: $now,
+            neverExpires: $neverExpires,
+            attributes: [
                 'name' => self::ALL_BEINGS_NAME,
                 'visitor_token' => null,
-                'expires_at' => $neverExpires,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-        }
+            ],
+        );
 
-        if (! DB::table('flower_offerings')->where('shrine', $shrine)->where('is_permanent', true)->exists()) {
-            DB::table('flower_offerings')->insert([
-                'shrine' => $shrine,
-                'is_permanent' => true,
+        self::ensureSinglePermanent(
+            table: 'flower_offerings',
+            shrine: $shrine,
+            now: $now,
+            neverExpires: $neverExpires,
+            attributes: [
                 'name' => self::ALL_BEINGS_NAME,
                 'visitor_token' => null,
                 'flower_type' => 'lotus',
                 'vase_color' => 'blue',
-                'expires_at' => $neverExpires,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-        }
+            ],
+        );
 
         $snowLionTrackId = DB::table('music_tracks')
             ->where('shrine', $shrine)
@@ -60,18 +58,64 @@ class PermanentOfferings
             return;
         }
 
-        if (! DB::table('music_offerings')->where('shrine', $shrine)->where('is_permanent', true)->exists()) {
-            DB::table('music_offerings')->insert([
-                'shrine' => $shrine,
-                'is_permanent' => true,
+        self::ensureSinglePermanent(
+            table: 'music_offerings',
+            shrine: $shrine,
+            now: $now,
+            neverExpires: $neverExpires,
+            attributes: [
                 'music_track_id' => $snowLionTrackId,
                 'name' => self::ALL_BEINGS_NAME,
                 'visitor_token' => null,
-                'expires_at' => $neverExpires,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-        }
+            ],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private static function ensureSinglePermanent(
+        string $table,
+        string $shrine,
+        $now,
+        $neverExpires,
+        array $attributes,
+    ): void {
+        DB::transaction(function () use ($table, $shrine, $now, $neverExpires, $attributes): void {
+            $permanentIds = DB::table($table)
+                ->where('shrine', $shrine)
+                ->where('is_permanent', true)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
+
+            if ($permanentIds->count() > 1) {
+                DB::table($table)
+                    ->whereIn('id', $permanentIds->slice(1)->all())
+                    ->delete();
+            }
+
+            $keeperId = $permanentIds->first();
+
+            if ($keeperId === null) {
+                DB::table($table)->insert(array_merge([
+                    'shrine' => $shrine,
+                    'is_permanent' => true,
+                    'expires_at' => $neverExpires,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ], $attributes));
+
+                return;
+            }
+
+            DB::table($table)
+                ->where('id', $keeperId)
+                ->update(array_merge($attributes, [
+                    'expires_at' => $neverExpires,
+                    'updated_at' => $now,
+                ]));
+        });
     }
 
     /**

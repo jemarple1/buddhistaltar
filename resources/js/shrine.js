@@ -357,6 +357,12 @@ function createMusicPlayerElement(offering) {
     return player;
 }
 
+let syncedMusicOfferingIds = null;
+
+function musicOfferingIdsKey(active) {
+    return (active ?? []).map((offering) => String(offering.id)).join('|');
+}
+
 function renderMusicOfferings(musicState) {
     const container = document.getElementById(OFFERED_MUSIC_ID);
     if (!container) {
@@ -364,14 +370,45 @@ function renderMusicOfferings(musicState) {
     }
 
     const active = musicState?.active ?? [];
+    const idsKey = musicOfferingIdsKey(active);
+    const domCount = container.querySelectorAll('[data-offering-id]').length;
 
-    syncOfferingRow(container, active, {
-        idKey: 'offeringId',
-        createItem: (offering) => {
-            const player = createMusicPlayerElement(offering);
-            player.classList.add('music-player');
-            return player;
-        },
+    if (idsKey === syncedMusicOfferingIds && domCount === active.length) {
+        return;
+    }
+
+    syncedMusicOfferingIds = idsKey;
+
+    const desiredIds = new Set(active.map((offering) => String(offering.id)));
+    const seenIds = new Set();
+
+    container.querySelectorAll('[data-offering-id]').forEach((player) => {
+        const id = player.dataset.offeringId ?? '';
+
+        if (seenIds.has(id) || !desiredIds.has(id)) {
+            player.remove();
+            return;
+        }
+
+        seenIds.add(id);
+    });
+
+    active.forEach((offering, index) => {
+        const id = String(offering.id);
+        let player = container.querySelector(`[data-offering-id="${id}"]`);
+
+        if (!player) {
+            player = createMusicPlayerElement(offering);
+        }
+
+        if (offering.is_permanent) {
+            player.dataset.isPermanent = 'true';
+        }
+
+        const referenceNode = container.children[index] ?? null;
+        if (container.children[index] !== player) {
+            container.insertBefore(player, referenceNode);
+        }
     });
 }
 
@@ -1136,79 +1173,6 @@ function offeringRowAppendPoint(container, itemSelector) {
     return offeringRowLandingPoint(container);
 }
 
-function syncOfferingRow(container, items, options) {
-    if (!container) {
-        return;
-    }
-
-    const { idKey, createItem, updateItem } = options;
-    const itemIds = new Set(items.map((item) => String(item.id)));
-    const orderedElements = [];
-
-    items.forEach((item) => {
-        let element = container.querySelector(`[data-${idKey}="${item.id}"]`);
-
-        if (!element) {
-            element = createItem(item);
-        } else if (updateItem) {
-            updateItem(element, item);
-        }
-
-        if (item.is_permanent) {
-            element.dataset.isPermanent = 'true';
-        }
-
-        orderedElements.push(element);
-    });
-
-    container.querySelectorAll(`[data-${idKey}]`).forEach((element) => {
-        const id = element.dataset[idKey] ?? '';
-        if (element.dataset.isPermanent === 'true') {
-            return;
-        }
-
-        if (!itemIds.has(id)) {
-            element.remove();
-        }
-    });
-
-    orderedElements.forEach((element) => {
-        container.appendChild(element);
-    });
-}
-
-function updateFlowerElement(element, flower) {
-    const label = element.querySelector('.offering-name');
-    const name = flower.name ?? '';
-
-    if (name && label) {
-        label.textContent = name;
-    } else if (name && !label) {
-        const nextLabel = document.createElement('span');
-        nextLabel.className = 'offering-name';
-        nextLabel.textContent = name;
-        element.appendChild(nextLabel);
-    } else if (!name && label) {
-        label.remove();
-    }
-}
-
-function updateLampElement(element, lamp) {
-    const label = element.querySelector('.lamp-name');
-    const name = lamp.name ?? '';
-
-    if (name && label) {
-        label.textContent = name;
-    } else if (name && !label) {
-        const nextLabel = document.createElement('span');
-        nextLabel.className = 'lamp-name';
-        nextLabel.textContent = name;
-        element.appendChild(nextLabel);
-    } else if (!name && label) {
-        label.remove();
-    }
-}
-
 function seedOfferedLamps() {
     const container = document.getElementById(OFFERED_LAMPS_ID);
     const lamps = container?.querySelectorAll('.butter-lamp[data-lamp-id]') ?? [];
@@ -1219,10 +1183,35 @@ function seedOfferedLamps() {
     }));
 }
 
+function rebuildOfferingRow(container, items, createItem, afterRebuild = null) {
+    if (!container) {
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    (items ?? []).forEach((item) => {
+        const element = createItem(item);
+
+        if (item.is_permanent) {
+            element.dataset.isPermanent = 'true';
+        }
+
+        fragment.appendChild(element);
+    });
+
+    container.replaceChildren(fragment);
+
+    if (afterRebuild) {
+        afterRebuild();
+    }
+}
+
 function syncFlowers(flowers) {
-    syncOfferingRow(document.getElementById(OFFERED_FLOWERS_ID), flowers ?? [], {
-        idKey: 'flowerId',
-        createItem: (flower) => createFlowerElement(
+    rebuildOfferingRow(
+        document.getElementById(OFFERED_FLOWERS_ID),
+        flowers,
+        (flower) => createFlowerElement(
             flower.name,
             flower.id,
             flower.flower_type,
@@ -1230,18 +1219,16 @@ function syncFlowers(flowers) {
             false,
             flower.is_permanent,
         ),
-        updateItem: updateFlowerElement,
-    });
+    );
 }
 
 function syncLamps(lamps) {
-    syncOfferingRow(document.getElementById(OFFERED_LAMPS_ID), lamps ?? [], {
-        idKey: 'lampId',
-        createItem: (lamp) => createLampElement(lamp.name, lamp.id, false, lamp.is_permanent),
-        updateItem: updateLampElement,
-    });
-
-    startLampRayInterval();
+    rebuildOfferingRow(
+        document.getElementById(OFFERED_LAMPS_ID),
+        lamps,
+        (lamp) => createLampElement(lamp.name, lamp.id, false, lamp.is_permanent),
+        startLampRayInterval,
+    );
 }
 
 function renderFlowers(flowers) {

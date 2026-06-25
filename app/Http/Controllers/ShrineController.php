@@ -423,7 +423,6 @@ class ShrineController extends Controller
      */
     private function buildShrineState(?string $visitorToken = null): array
     {
-        PermanentOfferings::ensureForShrine($this->shrineSlug);
         $this->pruneExpiredOfferings();
 
         $displayWater = $this->activeOfferingQuery(WaterBowlSession::class)
@@ -431,9 +430,12 @@ class ShrineController extends Controller
             ->orderByDesc('completed_at')
             ->first();
 
-        $lamps = $this->orderedOfferingQuery(ButterLamp::class)
-            ->limit(200)
-            ->get(['id', 'name', 'is_permanent', 'created_at'])
+        $lamps = $this->uniquePermanentOfferings(
+            $this->orderedOfferingQuery(ButterLamp::class)
+                ->limit(200)
+                ->get(['id', 'name', 'is_permanent', 'created_at']),
+            ButterLamp::class,
+        )
             ->map(fn (ButterLamp $lamp) => [
                 'id' => $lamp->id,
                 'name' => $lamp->name,
@@ -442,9 +444,12 @@ class ShrineController extends Controller
             ->values()
             ->all();
 
-        $flowers = $this->orderedOfferingQuery(FlowerOffering::class)
-            ->limit(100)
-            ->get(['id', 'name', 'flower_type', 'vase_color', 'is_permanent', 'created_at'])
+        $flowers = $this->uniquePermanentOfferings(
+            $this->orderedOfferingQuery(FlowerOffering::class)
+                ->limit(100)
+                ->get(['id', 'name', 'flower_type', 'vase_color', 'is_permanent', 'created_at']),
+            FlowerOffering::class,
+        )
             ->map(fn (FlowerOffering $flower) => [
                 'id' => $flower->id,
                 'name' => $flower->name,
@@ -559,9 +564,12 @@ class ShrineController extends Controller
             ->values()
             ->all();
 
-        $activeOfferings = $this->orderedOfferingQuery(MusicOffering::class)
-            ->with('track:id,youtube_id,youtube_start_seconds,title,thumbnail_url')
-            ->get();
+        $activeOfferings = $this->uniquePermanentOfferings(
+            $this->orderedOfferingQuery(MusicOffering::class)
+                ->with('track:id,youtube_id,youtube_start_seconds,title,thumbnail_url')
+                ->get(),
+            MusicOffering::class,
+        );
 
         $active = $activeOfferings
             ->values()
@@ -608,5 +616,28 @@ class ShrineController extends Controller
             ->count();
 
         return $activeCount % 2 === 0 ? 'left' : 'right';
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model>  $offerings
+     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $modelClass
+     * @return \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model>
+     */
+    private function uniquePermanentOfferings($offerings, string $modelClass)
+    {
+        $permanent = $offerings->where('is_permanent', true)->sortBy('id')->values();
+
+        if ($permanent->count() <= 1) {
+            return $offerings;
+        }
+
+        $keeperId = $permanent->first()->id;
+        $duplicateIds = $permanent->slice(1)->pluck('id');
+
+        $modelClass::query()->whereIn('id', $duplicateIds)->delete();
+
+        return $offerings
+            ->reject(fn ($offering) => $duplicateIds->contains($offering->id))
+            ->values();
     }
 }

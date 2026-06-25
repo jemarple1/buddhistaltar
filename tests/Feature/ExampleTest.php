@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Support\PermanentOfferings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -240,6 +242,22 @@ class ExampleTest extends TestCase
         $response->assertJsonFragment(['name' => 'All Beings']);
         $response->assertJsonFragment(['name' => 'Lotus']);
         $response->assertJsonPath('flowers.0.name', 'All Beings');
+    }
+
+    public function test_ensure_for_shrine_does_not_duplicate_permanent_music(): void
+    {
+        PermanentOfferings::ensureForShrine('avalokiteshvara');
+        PermanentOfferings::ensureForShrine('avalokiteshvara');
+
+        $this->assertSame(1, DB::table('music_offerings')->where('shrine', 'avalokiteshvara')->where('is_permanent', true)->count());
+        $this->assertSame(1, DB::table('butter_lamps')->where('shrine', 'avalokiteshvara')->where('is_permanent', true)->count());
+        $this->assertSame(1, DB::table('flower_offerings')->where('shrine', 'avalokiteshvara')->where('is_permanent', true)->count());
+
+        $response = $this->getJson('/offerings/state');
+
+        $this->assertCount(1, collect($response->json('music.active'))->where('is_permanent', true));
+        $this->assertCount(1, collect($response->json('lamps'))->where('is_permanent', true));
+        $this->assertCount(1, collect($response->json('flowers'))->where('is_permanent', true));
     }
 
     public function test_each_shrine_shares_the_same_music_catalog(): void
