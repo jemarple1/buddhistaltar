@@ -61,7 +61,8 @@ echo 'alias cloud="php ~/Developer/cloud-cli/cloud"' >> ~/.zshrc && source ~/.zs
 
 cloud auth
 git init && git add . && git commit -m "Prepare shrine for Laravel Cloud"
-gh repo create GreatCompassionateOne --public --source=. --push
+git remote add origin git@github.com:jemarple1/buddhistaltar.git
+git push -u origin main
 cloud ship
 ```
 
