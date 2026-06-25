@@ -398,6 +398,7 @@ class ShrineController extends Controller
             )
             ->sortBy('created_at')
             ->pluck('name')
+            ->filter(fn (string $name): bool => $name !== PermanentOfferings::ALL_BEINGS_NAME)
             ->values();
 
         return $entries->all();
@@ -411,6 +412,7 @@ class ShrineController extends Controller
         return $this->activeOfferingQuery(ButterLamp::class)
             ->whereNotNull('name')
             ->where('name', '!=', '')
+            ->where('name', '!=', PermanentOfferings::ALL_BEINGS_NAME)
             ->orderBy('is_permanent')
             ->orderByDesc('created_at')
             ->limit(200)

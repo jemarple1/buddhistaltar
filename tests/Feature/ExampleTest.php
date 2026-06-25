@@ -357,6 +357,15 @@ class ExampleTest extends TestCase
         $response->assertJsonPath('visitor_offerings.0.label', 'butter lamp offering');
     }
 
+    public function test_dedication_names_exclude_all_beings(): void
+    {
+        $response = $this->getJson('/offerings/state');
+
+        $response->assertOk();
+        $this->assertNotContains('All Beings', $response->json('offering_names') ?? []);
+        $this->assertNotContains('All Beings', $response->json('dedication_names') ?? []);
+    }
+
     public function test_push_subscription_can_be_stored(): void
     {
         $response = $this->postJson('/push-subscriptions', [

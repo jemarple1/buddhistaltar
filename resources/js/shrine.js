@@ -86,6 +86,7 @@ const BTN_CLOSE_DEDICATION_ID = 'btn-close-dedication';
 const MERIT_NAMES_CAROUSEL_ID = 'merit-names-carousel';
 const MERIT_NAMES_TRACK_ID = 'merit-names-track';
 const MERIT_NAMES_PIXELS_PER_SECOND = 28;
+const MERIT_DEDICATION_EXCLUDED_NAME = 'All Beings';
 
 const SYLLABLES = [
     { text: 'OṂ', className: 'syllable-particle--om' },
@@ -109,6 +110,7 @@ let notifiedVisitorOfferings = new Set();
 let installPromptTimer = null;
 let installPromptScheduled = false;
 const pageLoadedAt = Date.now();
+let meritNamesCarouselSignature = '';
 
 const CLOUD_TARGET_BASE = 36;
 const CLOUD_TARGET_PER_STICK = 14;
@@ -208,15 +210,19 @@ function renderDedication(names) {
         return;
     }
 
-    if (!names.length) {
+    const filtered = names.filter(
+        (name) => typeof name === 'string' && name.trim() !== MERIT_DEDICATION_EXCLUDED_NAME,
+    );
+
+    if (!filtered.length) {
         dedication.textContent = 'Dedicated toward all butter lamp offerings.';
         return;
     }
 
     const formattedNames =
-        names.length === 1
-            ? names[0]
-            : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+        filtered.length === 1
+            ? filtered[0]
+            : `${filtered.slice(0, -1).join(', ')} and ${filtered[filtered.length - 1]}`;
 
     dedication.textContent = `Dedicated toward all butter lamp offerings, including ${formattedNames}.`;
 }
@@ -227,11 +233,14 @@ function applyShrineState() {
     syncLamps(shrineState.lamps ?? []);
     renderMusicOfferings(shrineState.music);
     applyWaterState(shrineState.water ?? {});
-    populateMeritNamesCarousel(shrineState.offering_names ?? []);
     updateLivePractitioners(shrineState.live_practitioners ?? 0);
     updateMantraTotal(shrineState.mantra_total ?? 0);
     syncVisitorOfferingNotifications(shrineState.visitor_offerings ?? []);
     renderDedication(shrineState.dedication_names ?? []);
+
+    if (isDedicationModalOpen()) {
+        populateMeritNamesCarousel(shrineState.offering_names ?? []);
+    }
 }
 
 function escapeHtml(text) {
@@ -557,7 +566,11 @@ async function selectMusicTrack(track, cardEl) {
 
         mergeShrineState(data.shrine_state);
         renderMusicOfferings(shrineState.music);
-        populateMeritNamesCarousel(shrineState.offering_names ?? []);
+        if (isDedicationModalOpen()) {
+            populateMeritNamesCarousel(shrineState.offering_names ?? [], { force: true });
+        } else {
+            invalidateMeritNamesCarousel();
+        }
 
         if (nameInput) {
             nameInput.value = '';
@@ -1447,8 +1460,8 @@ async function offerWater() {
         applyShrineState();
         if (Array.isArray(data.offering_names)) {
             shrineState.offering_names = data.offering_names;
-            populateMeritNamesCarousel(data.offering_names);
         }
+        refreshMeritNamesCarouselFromState({ force: true });
         if (nameInput) {
             nameInput.value = '';
         }
@@ -1842,26 +1855,52 @@ function initFirstVisitPrompts() {
 function syncMeritNamesDuration(track) {
     const set = track?.querySelector('.merit-names-set');
     if (!set) {
-        return;
+        return false;
     }
 
     const width = set.getBoundingClientRect().width;
     if (width <= 0) {
-        return;
+        return false;
     }
 
     const duration = Math.max(60, width / MERIT_NAMES_PIXELS_PER_SECOND);
     track.style.setProperty('--merit-names-duration', `${duration}s`);
+
+    return true;
 }
 
-function populateMeritNamesCarousel(names) {
+function meritNamesForCarousel(names) {
+    return names.filter(
+        (name) => typeof name === 'string'
+            && name.trim() !== ''
+            && name.trim() !== MERIT_DEDICATION_EXCLUDED_NAME,
+    );
+}
+
+function isDedicationModalOpen() {
+    const modal = document.getElementById(DEDICATION_MODAL_ID);
+    return Boolean(modal && !modal.hidden);
+}
+
+function invalidateMeritNamesCarousel() {
+    meritNamesCarouselSignature = '';
+}
+
+function populateMeritNamesCarousel(names, { force = false } = {}) {
     const carousel = document.getElementById(MERIT_NAMES_CAROUSEL_ID);
     const track = document.getElementById(MERIT_NAMES_TRACK_ID);
     if (!carousel || !track) {
         return;
     }
 
-    const list = names.filter((name) => typeof name === 'string' && name.trim() !== '');
+    const list = meritNamesForCarousel(names);
+    const signature = list.join('\0');
+
+    if (!force && signature === meritNamesCarouselSignature) {
+        return;
+    }
+
+    meritNamesCarouselSignature = signature;
 
     if (list.length === 0) {
         carousel.classList.add('hidden');
@@ -1871,8 +1910,8 @@ function populateMeritNamesCarousel(names) {
     }
 
     carousel.classList.remove('hidden');
-    track.replaceChildren();
     track.classList.remove('is-animating');
+    track.replaceChildren();
 
     const setA = document.createElement('div');
     setA.className = 'merit-names-set';
@@ -1897,9 +1936,21 @@ function populateMeritNamesCarousel(names) {
     track.append(setA, setB);
 
     requestAnimationFrame(() => {
-        syncMeritNamesDuration(track);
-        track.classList.add('is-animating');
+        if (syncMeritNamesDuration(track)) {
+            track.classList.add('is-animating');
+        }
     });
+}
+
+function refreshMeritNamesCarouselFromState({ force = false } = {}) {
+    if (isDedicationModalOpen()) {
+        populateMeritNamesCarousel(shrineState.offering_names ?? [], { force });
+        return;
+    }
+
+    if (force) {
+        invalidateMeritNamesCarousel();
+    }
 }
 
 function openDedicationModal() {
@@ -1908,10 +1959,24 @@ function openDedicationModal() {
         return;
     }
 
-    populateMeritNamesCarousel(shrineState.offering_names ?? []);
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('overflow-hidden');
+
+    populateMeritNamesCarousel(shrineState.offering_names ?? [], { force: true });
+
+    requestAnimationFrame(() => {
+        const track = document.getElementById(MERIT_NAMES_TRACK_ID);
+        if (!track) {
+            return;
+        }
+
+        track.classList.remove('is-animating');
+        if (syncMeritNamesDuration(track)) {
+            track.classList.add('is-animating');
+        }
+    });
+
     document.getElementById(BTN_CLOSE_DEDICATION_ID)?.focus();
 }
 
@@ -2012,8 +2077,8 @@ async function offerLamp() {
         }
         if (Array.isArray(data.offering_names)) {
             shrineState.offering_names = data.offering_names;
-            populateMeritNamesCarousel(data.offering_names);
         }
+        refreshMeritNamesCarouselFromState({ force: true });
 
         isLit = false;
         closeLampOfferingModal(true);
