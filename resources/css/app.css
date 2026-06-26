@@ -105,17 +105,48 @@
         backface-visibility: hidden;
     }
 
+    .deity-image--vajrasattva {
+        filter: drop-shadow(0 10px 28px rgba(12, 74, 110, 0.22));
+    }
+
+    .deity-hero:has(.deity-image--vajrasattva) {
+        max-width: 17rem;
+        padding-inline: 0.75rem;
+    }
+
+    .deity-image-shell:has(.deity-image--vajrasattva) {
+        padding: 1.5rem;
+    }
+
+    .deity-image-shell:has(.deity-image--vajrasattva) > .deity-image {
+        width: 78%;
+        height: 78%;
+        margin-inline: auto;
+    }
+
+    .deity-image--shakyamuni,
     .deity-image--amitayus,
     .deity-image--amitabha {
         filter: drop-shadow(0 10px 28px rgba(12, 74, 110, 0.22));
     }
 
+    .deity-hero:has(.deity-image--shakyamuni),
     .deity-hero:has(.deity-image--amitayus),
     .deity-hero:has(.deity-image--amitabha) {
         max-width: 22rem;
     }
 
     @media (min-width: 640px) {
+        .deity-hero:has(.deity-image--vajrasattva) {
+            max-width: 19rem;
+            padding-inline: 1rem;
+        }
+
+        .deity-image-shell:has(.deity-image--vajrasattva) {
+            padding: 1.75rem;
+        }
+
+        .deity-hero:has(.deity-image--shakyamuni),
         .deity-hero:has(.deity-image--amitayus),
         .deity-hero:has(.deity-image--amitabha) {
             max-width: 26rem;
@@ -123,6 +154,15 @@
     }
 
     @media (min-width: 768px) {
+        .deity-hero:has(.deity-image--vajrasattva) {
+            max-width: 21rem;
+        }
+
+        .deity-image-shell:has(.deity-image--vajrasattva) {
+            padding: 2rem;
+        }
+
+        .deity-hero:has(.deity-image--shakyamuni),
         .deity-hero:has(.deity-image--amitayus),
         .deity-hero:has(.deity-image--amitabha) {
             max-width: 30rem;
@@ -1096,12 +1136,22 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
     }
 
-    .dedicate-merit-fab {
-        position: fixed;
-        left: 1rem;
-        bottom: 1rem;
-        z-index: 170;
+    .shrine-fab-stack {
         max-width: min(calc(100vw - 2rem), 12rem);
+    }
+
+    .shrine-fab--home {
+        color: rgba(12, 74, 110, 0.92);
+        text-decoration: none;
+        box-shadow: 0 10px 32px rgba(12, 74, 110, 0.22);
+    }
+
+    .shrine-fab--home:hover,
+    .shrine-fab--home:focus-visible {
+        color: rgba(12, 74, 110, 1);
+    }
+
+    .dedicate-merit-fab {
         border-radius: 9999px;
         padding: 0.625rem 1.125rem;
         font-size: 0.8125rem;
@@ -1205,6 +1255,154 @@
         outline: none;
         border-color: rgba(56, 130, 180, 0.65);
         box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.45);
+    }
+
+    .directory-hero {
+        max-width: 48rem;
+        margin-inline: auto;
+    }
+
+    .directory-buddha-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .directory-buddha-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.25rem 1rem;
+    }
+
+    @media (min-width: 640px) {
+        .directory-buddha-row {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1.5rem 1.25rem;
+        }
+    }
+
+    .directory-buddha-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        text-decoration: none;
+        color: inherit;
+        animation: directory-float 5s ease-in-out infinite;
+        animation-delay: var(--float-delay, 0s);
+    }
+
+    .directory-buddha-card:hover,
+    .directory-buddha-card:focus-visible {
+        transform: translateY(-4px) scale(1.02);
+        outline: none;
+    }
+
+    .directory-buddha-image-shell {
+        width: min(100%, 9rem);
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.92) 0%, rgba(224, 242, 254, 0.75) 55%, rgba(125, 211, 252, 0.35) 100%);
+        box-shadow:
+            0 10px 28px rgba(12, 74, 110, 0.22),
+            inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        overflow: hidden;
+    }
+
+    .directory-buddha-image {
+        width: 88%;
+        height: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 18px rgba(12, 74, 110, 0.18));
+    }
+
+    .directory-buddha-placeholder {
+        display: flex;
+        width: 72%;
+        aspect-ratio: 1;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(186, 230, 253, 0.95) 100%);
+        font-size: 2rem;
+        font-weight: 500;
+        color: rgba(12, 74, 110, 0.72);
+    }
+
+    .directory-buddha-label {
+        max-width: 9rem;
+        text-align: center;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.35;
+        color: rgba(255, 255, 255, 0.95);
+        text-shadow: 0 1px 6px rgba(12, 74, 110, 0.45);
+    }
+
+    .directory-main {
+        padding-top: 0.5rem;
+    }
+
+    .directory-panel {
+        border: 1px solid rgba(56, 130, 180, 0.22);
+        border-radius: 0.75rem;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(224, 242, 254, 0.94) 100%);
+        padding: 1.5rem 1.25rem 1.75rem;
+        box-shadow: 0 12px 40px rgba(12, 74, 110, 0.12);
+    }
+
+    @media (min-width: 640px) {
+        .directory-panel {
+            padding: 1.75rem 1.75rem 2rem;
+        }
+    }
+
+    .homage-section {
+        scroll-margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid rgba(12, 74, 110, 0.08);
+    }
+
+    .homage-section:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+    }
+
+    .homage-section-title {
+        margin-bottom: 0.65rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-style: normal;
+        letter-spacing: 0.04em;
+        color: rgba(12, 74, 110, 0.92);
+    }
+
+    .offering-benefit-quote {
+        margin: 1.25rem 0;
+        padding-left: 1rem;
+        border-left: 3px solid rgba(56, 130, 180, 0.35);
+        color: rgba(12, 74, 110, 0.88);
+    }
+
+    .offering-benefit-quote footer {
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        font-style: normal;
+        color: rgba(12, 74, 110, 0.6);
+    }
+}
+
+@keyframes directory-float {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
     }
 }
 
@@ -1483,5 +1681,9 @@
 
     .merit-names-track.is-animating {
         animation: none !important;
+    }
+
+    .directory-buddha-card {
+        animation: none;
     }
 }

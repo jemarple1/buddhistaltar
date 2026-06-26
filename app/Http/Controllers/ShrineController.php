@@ -13,6 +13,7 @@ use App\Models\PractitionerPresence;
 use App\Models\WaterBowlSession;
 use App\Support\OfferingGuard;
 use App\Support\PermanentOfferings;
+use App\Support\PublicShrineState;
 use App\Support\ShrineRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,23 +57,18 @@ class ShrineController extends Controller
             ->limit(100)
             ->get(['id', 'name', 'flower_type', 'vase_color', 'is_permanent', 'created_at']);
 
-        $dedicationNames = $this->dedicationNames();
-
-        $offeringNames = $this->offeringNames();
-
         $totalMantraCount = (int) $this->shrineQuery(MantraRepetition::class)->sum('count');
 
         $shrineState = $this->buildShrineState();
 
-        return view('shrine', compact(
-            'shrine',
-            'lamps',
-            'flowers',
-            'dedicationNames',
-            'offeringNames',
-            'totalMantraCount',
-            'shrineState',
-        ));
+        return view('shrine', [
+            'shrine' => $shrine,
+            'lamps' => $lamps,
+            'flowers' => $flowers,
+            'totalMantraCount' => $totalMantraCount,
+            'shrineState' => PublicShrineState::forHtml($shrineState),
+            'seo' => ShrineRegistry::seoMeta($this->shrineSlug),
+        ]);
     }
 
     public function state(Request $request): JsonResponse
@@ -80,9 +76,11 @@ class ShrineController extends Controller
         $this->resolveShrine($request);
         $visitorToken = $request->string('visitor_token')->toString();
 
-        return response()->json($this->buildShrineState(
-            visitorToken: Str::isUuid($visitorToken) ? $visitorToken : null,
-        ));
+        return response()
+            ->json($this->buildShrineState(
+                visitorToken: Str::isUuid($visitorToken) ? $visitorToken : null,
+            ))
+            ->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
     public function heartbeat(Request $request): JsonResponse

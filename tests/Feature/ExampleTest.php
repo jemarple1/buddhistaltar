@@ -14,6 +14,8 @@ class ExampleTest extends TestCase
 
     private const VISITOR_TOKEN = '550e8400-e29b-41d4-a716-446655440000';
 
+    private const AVALOKITESHVARA = '/avalokiteshvara';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -26,9 +28,23 @@ class ExampleTest extends TestCase
         return array_merge(['visitor_token' => self::VISITOR_TOKEN], $extra);
     }
 
-    public function test_the_shrine_page_loads(): void
+    public function test_the_home_directory_page_loads(): void
     {
         $response = $this->get('/');
+
+        $response->assertStatus(200);
+        $response->assertSee('Namo Buddhaya!');
+        $response->assertSee('Homage to all of the Buddhas!');
+        $response->assertSee('Avalokiteśvara', false);
+        $response->assertSee('Verses of Homage to the Buddhas and Bodhisattvas', false);
+        $response->assertSee('On Offering Before the Buddhas', false);
+        $response->assertSee('rimé', false);
+        $response->assertDontSee('Mantra Repetitions', false);
+    }
+
+    public function test_the_shrine_page_loads(): void
+    {
+        $response = $this->get(self::AVALOKITESHVARA);
 
         $response->assertStatus(200);
         $response->assertSee('Namo');
@@ -45,6 +61,7 @@ class ExampleTest extends TestCase
         $response->assertSee('Please pair this recitation with prostrations');
         $response->assertSee('Accept');
         $response->assertSee('Dedicate the merit');
+        $response->assertSee('Return to all buddhas', false);
         $response->assertSee('The Dedication of Merit');
         $response->assertSee('Read the Sutra');
         $response->assertSee('The Dhāraṇī of Noble Avalokiteśvara');
@@ -61,7 +78,7 @@ class ExampleTest extends TestCase
 
     public function test_a_butter_lamp_can_be_offered(): void
     {
-        $response = $this->postJson('/butter-lamps', $this->visitorPayload([
+        $response = $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload([
             'name' => 'Tenzin',
         ]));
 
@@ -73,17 +90,17 @@ class ExampleTest extends TestCase
 
     public function test_mantra_repetitions_are_pooled(): void
     {
-        $response = $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 108]));
+        $response = $this->postJson('/avalokiteshvara/mantra-repetitions', $this->visitorPayload(['count' => 108]));
         $response->assertCreated();
         $response->assertJsonPath('total_count', 108);
 
-        $response = $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 7]));
+        $response = $this->postJson('/avalokiteshvara/mantra-repetitions', $this->visitorPayload(['count' => 7]));
         $response->assertJsonPath('total_count', 115);
     }
 
     public function test_incense_offering_adds_stick_and_sets_expiry(): void
     {
-        $response = $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Sam']));
+        $response = $this->postJson('/avalokiteshvara/incense-offerings', $this->visitorPayload(['name' => 'Sam']));
         $response->assertCreated();
         $response->assertJsonStructure(['offering' => ['expires_at'], 'shrine_state']);
         $response->assertJsonPath('shrine_state.incense.sticks', 3);
@@ -114,7 +131,7 @@ class ExampleTest extends TestCase
             ->where('shrine', 'avalokiteshvara')
             ->value('id');
 
-        $response = $this->postJson('/music-offerings', $this->visitorPayload([
+        $response = $this->postJson('/avalokiteshvara/music-offerings', $this->visitorPayload([
             'track_id' => $trackId,
             'name' => 'Mila',
         ]));
@@ -131,7 +148,7 @@ class ExampleTest extends TestCase
 
     public function test_music_suggestion_is_stored(): void
     {
-        $response = $this->postJson('/music-suggestions', $this->visitorPayload([
+        $response = $this->postJson('/avalokiteshvara/music-suggestions', $this->visitorPayload([
             'url' => 'https://www.youtube.com/watch?v=abc123xyz12',
             'name' => 'Sam',
         ]));
@@ -145,7 +162,7 @@ class ExampleTest extends TestCase
 
     public function test_water_offering_can_be_made_with_a_name(): void
     {
-        $response = $this->postJson('/water-offerings', $this->visitorPayload(['name' => 'Tenzin']));
+        $response = $this->postJson('/avalokiteshvara/water-offerings', $this->visitorPayload(['name' => 'Tenzin']));
 
         $response->assertCreated();
         $response->assertJsonPath('offering.name', 'Tenzin');
@@ -158,7 +175,7 @@ class ExampleTest extends TestCase
 
     public function test_flower_offering_is_stored(): void
     {
-        $response = $this->postJson('/flower-offerings', $this->visitorPayload(['name' => 'Lotus']));
+        $response = $this->postJson('/avalokiteshvara/flower-offerings', $this->visitorPayload(['name' => 'Lotus']));
         $response->assertCreated();
         $response->assertJsonPath('offering.name', 'Lotus');
         $response->assertJsonStructure(['offering' => ['flower_type', 'vase_color']]);
@@ -167,10 +184,10 @@ class ExampleTest extends TestCase
 
     public function test_offering_state_includes_lamps_and_mantra_total(): void
     {
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
-        $this->postJson('/mantra-repetitions', $this->visitorPayload(['count' => 21]))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/avalokiteshvara/mantra-repetitions', $this->visitorPayload(['count' => 21]))->assertCreated();
 
-        $response = $this->getJson('/offerings/state?visitor_token='.self::VISITOR_TOKEN);
+        $response = $this->getJson('/avalokiteshvara/offerings/state?visitor_token='.self::VISITOR_TOKEN);
 
         $response->assertOk();
         $response->assertJsonFragment(['name' => 'All Beings']);
@@ -180,7 +197,7 @@ class ExampleTest extends TestCase
 
     public function test_profanity_in_offering_names_is_rejected(): void
     {
-        $response = $this->postJson('/flower-offerings', $this->visitorPayload([
+        $response = $this->postJson('/avalokiteshvara/flower-offerings', $this->visitorPayload([
             'name' => 'bad shit',
         ]));
 
@@ -191,11 +208,11 @@ class ExampleTest extends TestCase
     public function test_visitor_is_limited_to_three_offerings_per_type(): void
     {
         foreach (['One', 'Two', 'Three'] as $name) {
-            $this->postJson('/incense-offerings', $this->visitorPayload(['name' => $name]))
+            $this->postJson('/avalokiteshvara/incense-offerings', $this->visitorPayload(['name' => $name]))
                 ->assertCreated();
         }
 
-        $response = $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Four']));
+        $response = $this->postJson('/avalokiteshvara/incense-offerings', $this->visitorPayload(['name' => 'Four']));
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['visitor_token']);
@@ -203,18 +220,18 @@ class ExampleTest extends TestCase
 
     public function test_offerings_expire_after_twenty_four_hours(): void
     {
-        $this->postJson('/incense-offerings', $this->visitorPayload(['name' => 'Sam']))->assertCreated();
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
-        $this->postJson('/water-offerings', $this->visitorPayload(['name' => 'Mila']))->assertCreated();
+        $this->postJson('/avalokiteshvara/incense-offerings', $this->visitorPayload(['name' => 'Sam']))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/avalokiteshvara/water-offerings', $this->visitorPayload(['name' => 'Mila']))->assertCreated();
 
-        $response = $this->getJson('/offerings/state');
+        $response = $this->getJson('/avalokiteshvara/offerings/state');
         $response->assertJsonPath('incense.active_offerings', 1);
         $response->assertJsonFragment(['name' => 'Tenzin']);
         $response->assertJsonPath('water.display_name', 'Mila');
 
         $this->travel(25)->hours();
 
-        $response = $this->getJson('/offerings/state');
+        $response = $this->getJson('/avalokiteshvara/offerings/state');
         $response->assertJsonPath('incense.active_offerings', 0);
         $response->assertJsonPath('incense.sticks', 2);
         $response->assertJsonFragment(['name' => 'All Beings']);
@@ -225,8 +242,8 @@ class ExampleTest extends TestCase
 
     public function test_each_shrine_has_permanent_all_beings_offerings(): void
     {
-        foreach (['/', '/amitayus', '/amitabha'] as $path) {
-            $response = $this->getJson($path === '/' ? '/offerings/state' : "{$path}/offerings/state");
+        foreach (['/shakyamuni', '/avalokiteshvara', '/vajrasattva', '/amitayus', '/amitabha'] as $path) {
+            $response = $this->getJson("{$path}/offerings/state");
 
             $response->assertOk();
             $response->assertJsonFragment(['name' => 'All Beings']);
@@ -238,9 +255,9 @@ class ExampleTest extends TestCase
 
     public function test_visitor_flower_is_added_alongside_all_beings_flower(): void
     {
-        $this->postJson('/flower-offerings', $this->visitorPayload(['name' => 'Lotus']))->assertCreated();
+        $this->postJson('/avalokiteshvara/flower-offerings', $this->visitorPayload(['name' => 'Lotus']))->assertCreated();
 
-        $response = $this->getJson('/offerings/state');
+        $response = $this->getJson('/avalokiteshvara/offerings/state');
 
         $response->assertOk();
         $response->assertJsonFragment(['name' => 'All Beings']);
@@ -257,7 +274,7 @@ class ExampleTest extends TestCase
         $this->assertSame(1, DB::table('butter_lamps')->where('shrine', 'avalokiteshvara')->where('is_permanent', true)->count());
         $this->assertSame(1, DB::table('flower_offerings')->where('shrine', 'avalokiteshvara')->where('is_permanent', true)->count());
 
-        $response = $this->getJson('/offerings/state');
+        $response = $this->getJson('/avalokiteshvara/offerings/state');
 
         $this->assertCount(1, collect($response->json('music.active'))->where('is_permanent', true));
         $this->assertCount(1, collect($response->json('lamps'))->where('is_permanent', true));
@@ -273,13 +290,40 @@ class ExampleTest extends TestCase
             'Until Space Remains by Philip Glass',
         ];
 
-        foreach (['/', '/amitayus', '/amitabha'] as $path) {
-            $response = $this->getJson($path === '/' ? '/offerings/state' : "{$path}/offerings/state");
+        foreach (['/shakyamuni', '/avalokiteshvara', '/vajrasattva', '/amitayus', '/amitabha'] as $path) {
+            $response = $this->getJson("{$path}/offerings/state");
             $titles = collect($response->json('music.tracks'))->pluck('title')->sort()->values()->all();
 
             $response->assertOk();
             $this->assertSame($expectedTitles, $titles);
         }
+    }
+
+    public function test_shakyamuni_shrine_page_loads(): void
+    {
+        $response = $this->get('/shakyamuni');
+
+        $response->assertStatus(200);
+        $response->assertSee('Namo Buddhaya!');
+        $response->assertSee('Homage to Our Compassionate Teacher, Śākyamuni!');
+        $response->assertSee('Read the Prayer');
+        $response->assertSee('Homage to Śākyamuni Buddha', false);
+        $response->assertSee('tadyathā oṃ mune mune mahāmunaye svāhā');
+        $response->assertSee('Visit the Avalokiteśvara shrine', false);
+    }
+
+    public function test_vajrasattva_shrine_page_loads(): void
+    {
+        $response = $this->get('/vajrasattva');
+
+        $response->assertStatus(200);
+        $response->assertSee('Namo Vajrasattva!');
+        $response->assertSee('Homage to Glorious Vajrasattva!');
+        $response->assertSee('Read the Prayer');
+        $response->assertSee('In Praise of Glorious Vajrasattva', false);
+        $response->assertSee('oṃ vajra sattva hūṃ');
+        $response->assertSee('Visit the Avalokiteśvara shrine', false);
+        $response->assertSee('Visit the Amitāyus shrine', false);
     }
 
     public function test_amitayus_shrine_page_loads(): void
@@ -298,10 +342,10 @@ class ExampleTest extends TestCase
 
     public function test_amitayus_offerings_are_isolated_from_avalokiteshvara(): void
     {
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
         $this->postJson('/amitayus/butter-lamps', $this->visitorPayload(['name' => 'Amitayus']))->assertCreated();
 
-        $avalokiteshvara = $this->getJson('/offerings/state');
+        $avalokiteshvara = $this->getJson('/avalokiteshvara/offerings/state');
         $avalokiteshvara->assertJsonFragment(['name' => 'Chenrezik']);
         $avalokiteshvara->assertJsonMissing(['name' => 'Amitayus']);
 
@@ -326,11 +370,11 @@ class ExampleTest extends TestCase
 
     public function test_amitabha_offerings_are_isolated_from_other_shrines(): void
     {
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Chenrezik']))->assertCreated();
         $this->postJson('/amitayus/butter-lamps', $this->visitorPayload(['name' => 'Amitayus']))->assertCreated();
         $this->postJson('/amitabha/butter-lamps', $this->visitorPayload(['name' => 'Amitabha']))->assertCreated();
 
-        $avalokiteshvara = $this->getJson('/offerings/state');
+        $avalokiteshvara = $this->getJson('/avalokiteshvara/offerings/state');
         $avalokiteshvara->assertJsonFragment(['name' => 'Chenrezik']);
         $avalokiteshvara->assertJsonMissing(['name' => 'Amitabha']);
 
@@ -345,9 +389,9 @@ class ExampleTest extends TestCase
 
     public function test_offerings_state_includes_visitor_offerings_for_token(): void
     {
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
 
-        $response = $this->getJson('/offerings/state?'.http_build_query([
+        $response = $this->getJson('/avalokiteshvara/offerings/state?'.http_build_query([
             'visitor_token' => self::VISITOR_TOKEN,
         ]));
 
@@ -359,16 +403,65 @@ class ExampleTest extends TestCase
 
     public function test_dedication_names_exclude_all_beings(): void
     {
-        $response = $this->getJson('/offerings/state');
+        $response = $this->getJson('/avalokiteshvara/offerings/state');
 
         $response->assertOk();
+        $response->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $this->assertNotContains('All Beings', $response->json('offering_names') ?? []);
         $this->assertNotContains('All Beings', $response->json('dedication_names') ?? []);
     }
 
+    public function test_shrine_page_does_not_embed_visitor_offering_names(): void
+    {
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'PrivateName']))->assertCreated();
+
+        $response = $this->get(self::AVALOKITESHVARA);
+
+        $response->assertOk();
+        $response->assertDontSee('PrivateName', false);
+        $response->assertDontSee('"PrivateName"', false);
+    }
+
+    public function test_home_page_includes_seo_metadata(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('rel="canonical"', false);
+        $response->assertSee('property="og:title"', false);
+        $response->assertSee('name="twitter:card"', false);
+        $response->assertSee('application/ld+json', false);
+        $response->assertSee('Buddhist Altar — Homage to All the Buddhas', false);
+    }
+
+    public function test_shrine_page_includes_seo_metadata(): void
+    {
+        $response = $this->get(self::AVALOKITESHVARA);
+
+        $response->assertOk();
+        $response->assertSee('rel="canonical"', false);
+        $response->assertSee('property="og:title"', false);
+        $response->assertSee('name="twitter:card"', false);
+        $response->assertSee('application/ld+json', false);
+        $response->assertSee('Avalokiteśvara Online Shrine — Buddhist Altar', false);
+    }
+
+    public function test_sitemap_lists_home_and_all_shrines(): void
+    {
+        $response = $this->get('/sitemap.xml');
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'application/xml');
+        $response->assertSee('/shakyamuni', false);
+        $response->assertSee('/vajrasattva', false);
+        $response->assertSee('/avalokiteshvara', false);
+        $response->assertSee('/amitayus', false);
+        $response->assertSee('/amitabha', false);
+    }
+
     public function test_push_subscription_can_be_stored(): void
     {
-        $response = $this->postJson('/push-subscriptions', [
+        $response = $this->postJson('/avalokiteshvara/push-subscriptions', [
             'visitor_token' => self::VISITOR_TOKEN,
             'subscription' => [
                 'endpoint' => 'https://push.example.test/subscription/1',
@@ -391,7 +484,7 @@ class ExampleTest extends TestCase
 
     public function test_expiry_notifier_records_sent_notifications_without_vapid_keys(): void
     {
-        $this->postJson('/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
+        $this->postJson('/avalokiteshvara/butter-lamps', $this->visitorPayload(['name' => 'Tenzin']))->assertCreated();
 
         DB::table('butter_lamps')
             ->where('name', 'Tenzin')

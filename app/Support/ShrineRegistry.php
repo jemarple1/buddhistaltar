@@ -40,6 +40,13 @@ class ShrineRegistry
         return $prefix === '' ? '' : '/'.trim($prefix, '/');
     }
 
+    public static function shrinePath(string $slug): string
+    {
+        $prefix = (string) self::config($slug)['route_prefix'];
+
+        return '/'.trim($prefix !== '' ? $prefix : $slug, '/');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -73,19 +80,16 @@ class ShrineRegistry
             return [];
         }
 
-        $startAngle = 215.0;
-        $endAngle = 325.0;
+        /** @var list<float> Compass slots around the image; top center (270°) is omitted. */
+        $angleSlots = [315.0, 45.0, 135.0, 225.0, 0.0, 180.0, 90.0];
         $crosslinks = [];
 
         foreach ($others as $index => $otherSlug) {
             $config = self::config($otherSlug);
-            $prefix = (string) $config['route_prefix'];
-            $angle = $count === 1
-                ? 270.0
-                : $startAngle + ($index * ($endAngle - $startAngle) / ($count - 1));
+            $angle = $angleSlots[$index % count($angleSlots)];
 
             $crosslinks[] = [
-                'url' => $prefix === '' ? '/' : '/'.trim($prefix, '/'),
+                'url' => self::shrinePath($otherSlug),
                 'image' => (string) $config['deity_image'],
                 'label' => 'Visit the '.self::crosslinkDisplayName($otherSlug).' shrine',
                 'orbit_angle' => $angle,
@@ -99,10 +103,55 @@ class ShrineRegistry
     public static function crosslinkDisplayName(string $slug): string
     {
         return match ($slug) {
+            'shakyamuni' => 'Śākyamuni',
             'avalokiteshvara' => 'Avalokiteśvara',
+            'vajrasattva' => 'Vajrasattva',
             'amitayus' => 'Amitāyus',
             'amitabha' => 'Amitābha',
             default => ucfirst($slug),
         };
+    }
+
+    public static function canonicalUrl(string $slug): string
+    {
+        $base = rtrim((string) config('app.url'), '/');
+
+        return $base.self::shrinePath($slug);
+    }
+
+    /**
+     * @return array{title: string, description: string, canonical: string, image: string, structured_data: array<string, mixed>}
+     */
+    public static function seoMeta(string $slug): array
+    {
+        $config = self::config($slug);
+        $title = (string) ($config['seo_title'] ?? $config['page_title']);
+        $description = (string) $config['meta_description'];
+        $canonical = self::canonicalUrl($slug);
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'canonical' => $canonical,
+            'image' => asset($config['deity_image']),
+            'structured_data' => [
+                '@context' => 'https://schema.org',
+                '@type' => 'WebApplication',
+                'name' => $title,
+                'alternateName' => 'Buddhist Altar',
+                'url' => $canonical,
+                'description' => $description,
+                'applicationCategory' => 'LifestyleApplication',
+                'operatingSystem' => 'Web',
+                'inLanguage' => 'en',
+                'isAccessibleForFree' => true,
+                'image' => asset($config['deity_image']),
+                'offers' => [
+                    '@type' => 'Offer',
+                    'price' => '0',
+                    'priceCurrency' => 'USD',
+                ],
+            ],
+        ];
     }
 }

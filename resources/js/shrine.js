@@ -221,10 +221,10 @@ function renderDedication(names) {
 
     const formattedNames =
         filtered.length === 1
-            ? filtered[0]
-            : `${filtered.slice(0, -1).join(', ')} and ${filtered[filtered.length - 1]}`;
+            ? escapeHtml(filtered[0])
+            : `${filtered.slice(0, -1).map(escapeHtml).join(', ')} and ${escapeHtml(filtered[filtered.length - 1])}`;
 
-    dedication.textContent = `Dedicated toward all butter lamp offerings, including ${formattedNames}.`;
+    dedication.innerHTML = `Dedicated toward all butter lamp offerings, including <span data-nosnippet translate="no">${formattedNames}</span>.`;
 }
 
 function applyShrineState() {
@@ -249,6 +249,25 @@ function escapeHtml(text) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function markPrivateOfferingName(element) {
+    element.setAttribute('data-nosnippet', '');
+    element.setAttribute('translate', 'no');
+
+    return element;
+}
+
+function createOfferingNameLabel(className, name) {
+    const label = document.createElement('span');
+    label.className = className;
+    label.textContent = name;
+
+    return markPrivateOfferingName(label);
+}
+
+function offeringNameMarkup(className, name) {
+    return `<span class="${className}" data-nosnippet translate="no">${escapeHtml(name)}</span>`;
 }
 
 function isCoarsePointerDevice() {
@@ -348,7 +367,7 @@ function createMusicPlayerElement(offering) {
                     allowfullscreen
                 ></iframe>
             </div>
-            ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
+            ${offering.name ? offeringNameMarkup('music-offering-name', offering.name) : ''}
         `;
 
         player.querySelector('.music-play-overlay')?.addEventListener('click', () => {
@@ -368,7 +387,7 @@ function createMusicPlayerElement(offering) {
                 ></iframe>
             </div>
             <button type="button" class="music-unmute-btn">Unmute</button>
-            ${offering.name ? `<span class="music-offering-name">${escapeHtml(offering.name)}</span>` : ''}
+            ${offering.name ? offeringNameMarkup('music-offering-name', offering.name) : ''}
         `;
 
         player.querySelector('.music-unmute-btn')?.addEventListener('click', () => {
@@ -1304,10 +1323,7 @@ function createFlowerElement(name, id = null, flowerType = null, vaseColor = nul
     flower.innerHTML = flowerSvg(type, color);
 
     if (name) {
-        const label = document.createElement('span');
-        label.className = 'offering-name';
-        label.textContent = name;
-        flower.appendChild(label);
+        flower.appendChild(createOfferingNameLabel('offering-name', name));
     }
 
     return flower;
@@ -1326,10 +1342,7 @@ function createLampElement(name, id = null, animate = true, isPermanent = false)
     }
 
     if (name) {
-        const label = document.createElement('span');
-        label.className = 'lamp-name';
-        label.textContent = name;
-        lamp.appendChild(label);
+        lamp.appendChild(createOfferingNameLabel('lamp-name', name));
     }
 
     return lamp;
@@ -1349,6 +1362,7 @@ function syncShrineWaterBowls(water) {
     if (nameEl) {
         if (name) {
             nameEl.textContent = name;
+            markPrivateOfferingName(nameEl);
             nameEl.classList.remove('hidden');
             nameEl.removeAttribute('aria-hidden');
         } else {
@@ -1923,6 +1937,7 @@ function populateMeritNamesCarousel(names, { force = false } = {}) {
         const chip = document.createElement('span');
         chip.className = 'merit-name-chip';
         chip.textContent = name;
+        markPrivateOfferingName(chip);
         setA.appendChild(chip);
     });
 
@@ -1930,6 +1945,7 @@ function populateMeritNamesCarousel(names, { force = false } = {}) {
         const chip = document.createElement('span');
         chip.className = 'merit-name-chip';
         chip.textContent = name;
+        markPrivateOfferingName(chip);
         setB.appendChild(chip);
     });
 

@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     @include('partials.google-analytics')
+    @include('partials.seo')
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-    <meta name="description" content="{{ $shrine['meta_description'] }}">
+    <meta name="description" content="{{ $seo['description'] }}">
     <meta name="theme-color" content="#4aabf0">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -99,7 +100,7 @@
                                 <div class="water-bowl water-bowl-shrine" data-position="{{ $i }}"></div>
                             @endfor
                         </div>
-                        <span id="water-shrine-name" class="water-offering-name hidden" aria-hidden="true"></span>
+                        <span id="water-shrine-name" class="water-offering-name hidden" aria-hidden="true" data-nosnippet translate="no"></span>
                     </div>
 
                     <div class="altar-incense-flank altar-incense-flank--right">
@@ -119,9 +120,6 @@
                         data-vase-color="{{ $flower->vase_color ?? 'blue' }}"
                         @if ($flower->is_permanent) data-is-permanent="true" @endif
                     >
-                        @if ($flower->name)
-                            <span class="offering-name">{{ $flower->name }}</span>
-                        @endif
                     </div>
                 @endforeach
             </div>
@@ -133,9 +131,6 @@
                         data-lamp-id="{{ $lamp->id }}"
                         @if ($lamp->is_permanent) data-is-permanent="true" @endif
                     >
-                        @if ($lamp->name)
-                            <span class="lamp-name">{{ $lamp->name }}</span>
-                        @endif
                     </div>
                 @endforeach
             </div>
@@ -225,7 +220,7 @@
                         </p>
 
                         <p id="mantra-dedication" class="max-w-xl text-center text-sm italic leading-relaxed text-sky-950/75">
-                            @include('partials.mantra-dedication', ['dedicationNames' => $dedicationNames])
+                            Dedicated toward all butter lamp offerings.
                         </p>
 
                         <div class="flex w-full max-w-md flex-col gap-3 sm:flex-row sm:items-center">
@@ -266,9 +261,23 @@
         <button type="button" id="btn-dismiss-install" class="btn-shrine install-prompt-btn">Got it</button>
     </div>
 
-    <button type="button" id="btn-open-dedication" class="dedicate-merit-fab btn-shrine" aria-haspopup="dialog" aria-controls="dedication-modal">
-        Dedicate the merit
-    </button>
+    <div class="shrine-fab-stack fixed bottom-4 left-4 z-[170] flex flex-col items-start gap-2">
+        <a
+            href="{{ url('/') }}"
+            class="shrine-fab--home btn-shrine flex h-11 w-11 shrink-0 items-center justify-center rounded-full p-0"
+            aria-label="Return to all buddhas"
+            title="Return to all buddhas"
+        >
+            <svg class="h-5 w-5 shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <circle cx="12" cy="12" r="9.25"/>
+                <circle cx="12" cy="12" r="2.25"/>
+                <path d="M12 2.75v4.5M12 16.75v4.5M2.75 12h4.5M16.75 12h4.5M5.1 5.1l3.18 3.18M15.72 15.72l3.18 3.18M5.1 18.9l3.18-3.18M15.72 8.28l3.18-3.18"/>
+            </svg>
+        </a>
+        <button type="button" id="btn-open-dedication" class="dedicate-merit-fab btn-shrine shrink-0" aria-haspopup="dialog" aria-controls="dedication-modal">
+            Dedicate the merit
+        </button>
+    </div>
 
     <div id="lamp-offering-modal" class="shrine-modal" hidden aria-hidden="true">
         <div class="shrine-modal-backdrop" data-close-lamp aria-hidden="true"></div>
@@ -329,7 +338,7 @@
                 <button type="button" id="btn-close-dedication" class="shrine-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="shrine-modal-body">
-                @include('partials.merit-dedication', ['offeringNames' => $offeringNames])
+                @include('partials.merit-dedication')
                 <button type="button" id="btn-dismiss-dedication" class="btn-shrine mt-6 w-full rounded px-4 py-2.5 text-sm tracking-wide" data-close-dedication>Close</button>
             </div>
         </div>

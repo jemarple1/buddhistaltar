@@ -6,16 +6,12 @@
 
     <div
         id="merit-names-carousel"
-        class="merit-names-carousel @if (empty($offeringNames)) hidden @endif"
+        class="merit-names-carousel hidden"
         aria-label="Names of offerings"
+        data-nosnippet
+        translate="no"
     >
-        <div id="merit-names-track" class="merit-names-track">
-            <div class="merit-names-set">
-                @foreach ($offeringNames as $name)
-                    <span class="merit-name-chip">{{ $name }}</span>
-                @endforeach
-            </div>
-        </div>
+        <div id="merit-names-track" class="merit-names-track"></div>
     </div>
 
     <div>
